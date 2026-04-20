@@ -21,12 +21,17 @@ function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => vo
   );
 }
 
-const hashHistory = createHashHistory();
 
 export const getRouter = () => {
+  const history = typeof window !== "undefined" ? createHashHistory() : undefined;
+  
+  if (typeof window !== "undefined") {
+    console.log("Initializing router with history:", history ? "hash" : "none");
+  }
+
   const router = createRouter({
     routeTree,
-    history: hashHistory,
+    history,
     context: {},
     scrollRestoration: true,
     defaultPreloadStaleTime: 0,
