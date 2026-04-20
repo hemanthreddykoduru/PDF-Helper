@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PDF Helper</string>
+    <string name="title_activity_main">PDF Helper</string>
+    <string name="package_name">com.hemanth.pdfhelper</string>
+    <string name="custom_url_scheme">com.hemanth.pdfhelper</string>
+</resources>
