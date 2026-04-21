@@ -65,6 +65,12 @@
   --sidebar: oklch(0.16 0.008 260);
   --sidebar-foreground: oklch(0.95 0 0);
   --sidebar-border: oklch(0.28 0.012 260);
+
+  /* Safe Area Insets */
+  --sat: env(safe-area-inset-top);
+  --sar: env(safe-area-inset-right);
+  --sab: env(safe-area-inset-bottom);
+  --sal: env(safe-area-inset-left);
 }
 
 .light {
@@ -102,6 +108,12 @@
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    min-height: 100%;
+    /* Handle mobile viewport better */
+    min-height: -webkit-fill-available;
+  }
+  html {
+    height: -webkit-fill-available;
   }
 }
 
@@ -118,4 +130,17 @@
   .scrollbar-thin::-webkit-scrollbar-track {
     background: transparent;
   }
+
+  /* Safe Area Utilities */
+  .p-safe {
+    padding-top: var(--sat);
+    padding-right: var(--sar);
+    padding-bottom: var(--sab);
+    padding-left: var(--sal);
+  }
+  .pt-safe { padding-top: var(--sat); }
+  .pb-safe { padding-bottom: var(--sab); }
+  .mt-safe { margin-top: var(--sat); }
+  .mb-safe { margin-bottom: var(--sab); }
 }
+

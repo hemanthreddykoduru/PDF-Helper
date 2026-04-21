@@ -168,11 +168,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {SidebarNav}
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col pb-24 lg:pb-0">
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Banner is NOT sticky to avoid head-on collisions with the header */}
         <PrivacyBanner />
         
-        {/* Modern Mobile Header */}
-        <header className="sticky top-0 z-40 flex items-center justify-between border-b border-border bg-background/95 px-5 py-4 backdrop-blur-md lg:hidden">
+        {/* Modern Mobile Header with Safe Area Top */}
+        <header className="sticky top-0 z-40 flex items-center justify-between border-b border-border bg-background/95 px-5 py-4 pb-4 pt-[calc(1rem+var(--sat))] backdrop-blur-md lg:hidden">
           <Link to="/">
             <Logo className="scale-90 origin-left" />
           </Link>
@@ -187,16 +188,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1">
+        <main className="flex-1 pb-[calc(6rem+var(--sab))] lg:pb-0">
           {children}
         </main>
 
-        {/* Mobile Bottom Navigation & FAB */}
+        {/* Mobile Bottom Navigation & FAB with Safe Area Bottom */}
         <div className="fixed bottom-0 left-0 right-0 z-50 lg:hidden">
-          {/* FAB - The Red Plus Button */}
-          <div className="absolute left-1/2 -top-6 -translate-x-1/2">
+          {/* FAB - Adjusted for safe areas */}
+          <div className="absolute left-1/2 -top-8 -translate-x-1/2">
             <button 
-              className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#E11D48] text-white shadow-[0_8px_20px_-4px_rgba(225,29,72,0.4)] transition-transform active:scale-90"
+              className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#E11D48] text-white shadow-[0_8px_20px_-4px_rgba(225,29,72,0.4)] transition-transform active:scale-95"
               aria-label="Action"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="h-7 w-7">
@@ -206,12 +207,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </button>
           </div>
 
-          <nav className="flex items-center justify-around border-t border-border bg-background/95 px-4 py-3 backdrop-blur-lg">
+          <nav className="flex items-center justify-around border-t border-border bg-background/95 px-4 pb-[calc(0.75rem+var(--sab))] pt-3 backdrop-blur-lg">
             <Link to="/" className={cn("flex flex-col items-center gap-1 transition-colors", location.pathname === "/" ? "text-[#E11D48]" : "text-muted-foreground")}>
               <svg viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6">
                 <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
               </svg>
-              <span className="text-[10px] font-bold">Home</span>
+              <span className="text-[10px] font-black uppercase tracking-tight">Home</span>
             </Link>
             
             <button className="flex flex-col items-center gap-1 text-muted-foreground">
@@ -221,7 +222,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <rect x="14" y="3" width="7" height="7" rx="1" />
                 <rect x="14" y="14" width="7" height="7" rx="1" />
               </svg>
-              <span className="text-[10px] font-bold">Tools</span>
+              <span className="text-[10px] font-black uppercase tracking-tight">Tools</span>
             </button>
 
             {/* Spacer for FAB */}
@@ -232,7 +233,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <path d="M12 8v4l3 3" />
                 <circle cx="12" cy="12" r="9" />
               </svg>
-              <span className="text-[10px] font-bold">History</span>
+              <span className="text-[10px] font-black uppercase tracking-tight">History</span>
             </button>
 
             <button className="flex flex-col items-center gap-1 text-muted-foreground">
@@ -240,7 +241,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <circle cx="12" cy="12" r="3" />
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
               </svg>
-              <span className="text-[10px] font-bold">Settings</span>
+              <span className="text-[10px] font-black uppercase tracking-tight">Settings</span>
             </button>
           </nav>
         </div>
@@ -248,4 +249,5 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+
 
