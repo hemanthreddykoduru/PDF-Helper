@@ -25,6 +25,7 @@ import { useEffect, useState } from "react";
 import { getRecent, type RecentEntry } from "@/utils/fileUtils";
 import { cn, formatBytes } from "@/lib/utils";
 import { ToolPage } from "@/components/PageHeader";
+import { Capacitor } from "@capacitor/core";
 
 const iconMap: Record<string, any> = {
   Combine, Scissors, Minimize2, RotateCw, Lock, LockOpen, Image: ImageIcon,
@@ -110,27 +111,29 @@ function Dashboard() {
            </div>
         </section>
 
-        {/* Mobile App Promotion */}
-        <section className="relative overflow-hidden rounded-[40px] bg-primary p-8 text-white shadow-2xl">
-           <div className="absolute right-0 top-0 -mr-12 -mt-12 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
-           <div className="relative z-10 flex flex-col items-center text-center space-y-6">
-              <div className="h-16 w-16 rounded-[24px] bg-white/20 backdrop-blur-md flex items-center justify-center">
-                 <Smartphone className="h-8 w-8" />
-              </div>
-              <div className="space-y-2">
-                 <h3 className="text-2xl font-black tracking-tight">PDF Helper Mobile</h3>
-                 <p className="text-xs font-bold text-white/60 tracking-wider uppercase">V45 Master Build • Android</p>
-              </div>
-              <a 
-                href="/pdf-helper.apk" 
-                download
-                className="w-full flex items-center justify-center gap-3 bg-white text-primary rounded-2xl h-16 font-black tracking-tight hover:bg-white/90 active:scale-[0.98] transition-all text-base shadow-lg"
-              >
-                 <Download className="h-5 w-5" />
-                 Download Master APK
-              </a>
-           </div>
-        </section>
+        {/* Mobile App Promotion — Only visible on Web */}
+        {!Capacitor.isNativePlatform() && (
+          <section className="relative overflow-hidden rounded-[40px] bg-primary p-8 text-white shadow-2xl">
+             <div className="absolute right-0 top-0 -mr-12 -mt-12 h-64 w-64 rounded-full bg-white/10 blur-3xl" />
+             <div className="relative z-10 flex flex-col items-center text-center space-y-6">
+                <div className="h-16 w-16 rounded-[24px] bg-white/20 backdrop-blur-md flex items-center justify-center">
+                   <Smartphone className="h-8 w-8" />
+                </div>
+                <div className="space-y-2">
+                   <h3 className="text-2xl font-black tracking-tight">PDF Helper Mobile</h3>
+                   <p className="text-xs font-bold text-white/60 tracking-wider uppercase">V46 Master Build • Android</p>
+                </div>
+                <a 
+                  href="/pdf-helper.apk" 
+                  download
+                  className="w-full flex items-center justify-center gap-3 bg-white text-primary rounded-2xl h-16 font-black tracking-tight hover:bg-white/90 active:scale-[0.98] transition-all text-base shadow-lg"
+                >
+                   <Download className="h-5 w-5" />
+                   Download Master APK
+                </a>
+             </div>
+          </section>
+        )}
 
         {/* Protocol Activity Stream */}
         {recent.length > 0 && (
