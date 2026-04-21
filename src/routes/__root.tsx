@@ -1,4 +1,4 @@
-import { Outlet, createRootRoute, HeadContent } from "@tanstack/react-router";
+import { Outlet, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AppShell } from "@/components/AppShell";
 import "../styles.css";
@@ -24,7 +24,7 @@ function RootComponent() {
   const isCapacitor = typeof window !== "undefined" && (window as any).Capacitor;
 
   const content = (
-    <ThemeProvider>
+    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
       <AppShell>
         <Outlet />
       </AppShell>
@@ -32,20 +32,23 @@ function RootComponent() {
   );
 
   if (isCapacitor) {
-    // APK/Capacitor: Direct shell, no wrapping HTML tags
+    // APK/Capacitor: Direct shell
     return content;
   }
 
-  // Web/Vercel: Naked shell for SPA mounting. 
-  // We keep the structural tags for SSR shells but remove <Scripts/> 
-  // because we are mounting from scratch in entry-client.tsx.
+  // Web/Vercel/Start: Full HTML shell with hydration scripts
   return (
     <html lang="en">
       <head>
+        <meta charSet="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <HeadContent />
       </head>
       <body>
-        {content}
+        <div id="root">
+          {content}
+        </div>
+        <Scripts />
       </body>
     </html>
   );

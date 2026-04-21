@@ -1,4 +1,5 @@
 import { createRouter, useRouter, createHashHistory } from "@tanstack/react-router";
+import { routeTree } from "./routeTree.gen";
 
 function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
@@ -20,39 +21,27 @@ function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => vo
   );
 }
 
-// Singleton storage to prevent multiple initialization
-let routerInstance: ReturnType<typeof createRouter> | null = null;
+// Environment Detection
+const isCapacitor = typeof window !== "undefined" && (window as any).Capacitor;
+const history = typeof window !== "undefined" && isCapacitor ? createHashHistory() : undefined;
 
-export const getRouter = async () => {
-  if (routerInstance) return routerInstance;
+// We export a fixed singleton 'router' instance at the top-level.
+// This is the standard TanStack protocol and prevents most 'Invariant failed' errors.
+export const router = createRouter({
+  routeTree,
+  history,
+  basepath: "/", // Force absolute root for both platforms
+  context: {},
+  scrollRestoration: true,
+  defaultPreloadStaleTime: 0,
+  defaultErrorComponent: DefaultErrorComponent,
+});
 
-  // BREAK THE CIRCULAR DEPENDENCY:
-  // Dynamically import the routeTree so it's fully loaded before this function runs.
-  const { routeTree } = await import("./routeTree.gen");
+// Retro-compatibility with our entry point logic
+export const getRouter = () => router;
 
-  const isCapacitor = typeof window !== "undefined" && (window as any).Capacitor;
-  const history = typeof window !== "undefined" && isCapacitor ? createHashHistory() : undefined;
-  
-  if (typeof window !== "undefined") {
-    console.log("Initializing Singleton Router. Mode:", isCapacitor ? "Capacitor (Hash)" : "Web (Browser)");
-  }
-
-  routerInstance = createRouter({
-    routeTree,
-    history,
-    basepath: "/", // Explicitly set to absolute root to prevent 'Invariant failed'
-    context: {},
-    scrollRestoration: true,
-    defaultPreloadStaleTime: 0,
-    defaultErrorComponent: DefaultErrorComponent,
-  });
-
-  return routerInstance;
-};
-
-// Types are still safe for the global registration
 declare module "@tanstack/react-router" {
   interface Register {
-    router: Awaited<ReturnType<typeof getRouter>>;
+    router: typeof router;
   }
 }
