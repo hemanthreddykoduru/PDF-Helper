@@ -11,12 +11,6 @@ import { downloadBlob, stripExtension, addRecent } from "@/utils/fileUtils";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/split")({
-  head: () => ({
-    meta: [
-      { title: "Split PDF — PaperKnife" },
-      { name: "description", content: "Extract pages or split a PDF into multiple files locally." },
-    ],
-  }),
   component: SplitTool,
 });
 
@@ -40,8 +34,8 @@ function SplitTool() {
     const next = new Set<number>();
     rangeInput.split(",").forEach((part) => {
       const [a, b] = part.trim().split("-").map((n) => parseInt(n, 10));
-      if (!isNaN(a) && !isNaN(b)) for (let i = a; i <= b; i++) next.add(i);
-      else if (!isNaN(a)) next.add(a);
+      if (!isNaN(a) && !isNaN(b)) for (let i = Math.max(1, a); i <= Math.min(thumbs.length, b); i++) next.add(i);
+      else if (!isNaN(a) && a >= 1 && a <= thumbs.length) next.add(a);
     });
     setSelected(next);
   };
@@ -50,6 +44,7 @@ function SplitTool() {
     if (!file || selected.size === 0) return;
     setBusy(true);
     try {
+      await new Promise(resolve => setTimeout(resolve, 800));
       const indices = [...selected].sort((a, b) => a - b).map((p) => p - 1);
       const bytes = await extractPages(file, indices);
       const name = `${stripExtension(file.name)}-extract.pdf`;
@@ -64,6 +59,7 @@ function SplitTool() {
     if (!file) return;
     setBusy(true);
     try {
+      await new Promise(resolve => setTimeout(resolve, 1000));
       const pages = await splitToIndividualPages(file);
       const zip = new JSZip();
       pages.forEach((p) => zip.file(p.name, p.bytes));
@@ -78,106 +74,161 @@ function SplitTool() {
 
   return (
     <ToolPage>
-      <PageHeader
-        title="Split PDF"
-        description="Pick pages visually or by range. Download a single PDF or a ZIP of separate pages."
-        icon={<Scissors className="h-5 w-5" />}
-      />
-
-      {!file && (
-        <FileDropzone
-          onFiles={(files) => setFile(files[0])}
-          label="Drop a PDF to split"
-          hint="Or click to browse"
+      <div className="mx-auto max-w-4xl px-5 pt-6 sm:pt-10">
+        <PageHeader
+          title="Split PDF"
+          description="Precision extraction from any PDF archive."
+          icon={<Scissors className="h-5 w-5" />}
         />
-      )}
 
-      {file && (
-        <>
-          <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2.5 text-sm">
-            <span className="truncate font-medium">{file.name}</span>
-            <span className="text-muted-foreground">{thumbs.length} pages</span>
-            <button
-              onClick={() => {
-                setFile(null);
-                setSelected(new Set());
-              }}
-              className="ml-auto text-xs text-muted-foreground hover:text-primary"
-            >
-              Change file
-            </button>
-          </div>
-
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <input
-              value={rangeInput}
-              onChange={(e) => setRangeInput(e.target.value)}
-              placeholder="e.g. 1-3, 5, 8-10"
-              className="h-9 flex-1 min-w-[180px] rounded-md border border-border bg-surface px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        {!file && (
+          <div className="mt-8">
+            <FileDropzone
+              onFiles={(files) => setFile(files[0])}
+              label="Drop PDF to split"
+              hint="Extract pages visually or by range"
             />
-            <Button variant="outline" size="sm" onClick={applyRange}>
-              Apply range
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
-              Clear
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSelected(new Set(thumbs.map((t) => t.page)))}
-            >
-              Select all
-            </Button>
           </div>
+        )}
 
-          {loading && <div className="py-10 text-center text-muted-foreground">Rendering pages…</div>}
-
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-            {thumbs.map((t) => {
-              const isSel = selected.has(t.page);
-              return (
-                <button
-                  key={t.page}
-                  onClick={() => togglePage(t.page)}
-                  className={cn(
-                    "group relative overflow-hidden rounded-lg border-2 bg-white transition-all",
-                    isSel ? "border-primary ring-2 ring-primary/30" : "border-border hover:border-primary/50",
-                  )}
-                >
-                  <img src={t.dataUrl} alt={`Page ${t.page}`} className="h-auto w-full" />
-                  <div
-                    className={cn(
-                      "absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold",
-                      isSel
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-black/60 text-white opacity-0 group-hover:opacity-100",
-                    )}
-                  >
-                    {isSel ? <Check className="h-3.5 w-3.5" /> : t.page}
-                  </div>
-                  <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-2 py-1 text-center text-[11px] font-medium text-white">
-                    Page {t.page}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-            <div className="text-sm text-muted-foreground">
-              {selected.size > 0 ? `${selected.size} page${selected.size === 1 ? "" : "s"} selected` : "No pages selected"}
+        {file && (
+          <div className="mt-8 space-y-6">
+            {/* File Info Card */}
+            <div className="flex flex-col gap-4 rounded-[28px] border border-border/50 bg-surface p-6 sm:flex-row sm:items-center">
+               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                 <Check className={cn("h-6 w-6 transition-transform", selected.size > 0 && "scale-110")} />
+               </div>
+               <div className="flex-1 min-w-0">
+                 <div className="truncate text-base font-black tracking-tight">{file.name}</div>
+                 <div className="text-[10px] font-bold tracking-widest text-muted-foreground/60 uppercase">
+                    Source Document — {thumbs.length} pages
+                 </div>
+               </div>
+               <Button variant="ghost" size="sm" onClick={() => { setFile(null); setSelected(new Set()); }}>
+                 Change File
+               </Button>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={downloadPerPage} loading={busy}>
-                Download all as ZIP
-              </Button>
-              <Button onClick={downloadSelected} loading={busy} disabled={selected.size === 0}>
-                Extract {selected.size || ""} page{selected.size === 1 ? "" : "s"}
-              </Button>
+
+            {/* Split Options */}
+            <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+              <div className="space-y-6">
+                <div className="flex items-center justify-between px-1">
+                   <h3 className="text-[10px] font-black tracking-widest text-muted-foreground/60 uppercase">
+                    Visual Page Selection ({selected.size})
+                  </h3>
+                  <div className="flex gap-2">
+                     <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
+                       Clear
+                     </Button>
+                     <Button variant="ghost" size="sm" onClick={() => setSelected(new Set(thumbs.map((t) => t.page)))}>
+                       All
+                     </Button>
+                  </div>
+                </div>
+
+                {loading ? (
+                   <div className="flex flex-col items-center justify-center py-20 text-center">
+                     <div className="mb-4 h-10 w-10 animate-spin rounded-full border-2 border-primary/20 border-t-primary" />
+                     <div className="text-[10px] font-black tracking-widest text-muted-foreground/40 uppercase">
+                       Rendering Previews
+                     </div>
+                   </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+                    {thumbs.map((t) => {
+                      const isSel = selected.has(t.page);
+                      return (
+                        <button
+                          key={t.page}
+                          onClick={() => togglePage(t.page)}
+                          className={cn(
+                            "group relative aspect-[3/4] overflow-hidden rounded-[20px] border-2 bg-white transition-all active:scale-[0.98]",
+                            isSel ? "border-primary shadow-lg ring-4 ring-primary/10" : "border-border/60 hover:border-primary/40",
+                          )}
+                        >
+                          <img src={t.dataUrl} alt={`Page ${t.page}`} className="h-full w-full object-cover" />
+                          <div
+                            className={cn(
+                              "absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-black shadow-sm transition-all transition-all duration-300",
+                              isSel
+                                ? "bg-primary text-white scale-110"
+                                : "bg-black/40 text-white group-hover:bg-primary/80 group-hover:scale-105",
+                            )}
+                          >
+                            {isSel ? <Check className="h-4 w-4" /> : t.page}
+                          </div>
+                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-3 text-center">
+                            <span className="text-[9px] font-black tracking-wider text-white uppercase">Page {t.page}</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Sidebar Controls */}
+              <div className="space-y-6">
+                 <div className="rounded-[28px] border border-border/50 bg-surface p-6 space-y-4">
+                    <h4 className="text-[10px] font-black tracking-widest text-muted-foreground/60 uppercase">
+                      Precision Range
+                    </h4>
+                    <div className="space-y-3">
+                      <input
+                        value={rangeInput}
+                        onChange={(e) => setRangeInput(e.target.value)}
+                        placeholder="e.g. 1-3, 5, 8-10"
+                        className="w-full h-11 rounded-xl border border-border bg-background px-4 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 placeholder:font-normal placeholder:text-muted-foreground/40"
+                      />
+                      <Button variant="secondary" className="w-full" size="sm" onClick={applyRange}>
+                        Inject Range
+                      </Button>
+                    </div>
+                 </div>
+
+                 <div className="rounded-[28px] border border-border/50 bg-surface p-6 space-y-4">
+                    <h4 className="text-[10px] font-black tracking-widest text-muted-foreground/60 uppercase">
+                      Extraction Mode
+                    </h4>
+                    <div className="space-y-3">
+                      <Button 
+                        onClick={downloadSelected} 
+                        loading={busy} 
+                        disabled={selected.size === 0}
+                        className="w-full"
+                      >
+                        Extract Pages
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        onClick={downloadPerPage} 
+                        loading={busy} 
+                        className="w-full"
+                      >
+                        Split to ZIP
+                      </Button>
+                    </div>
+                 </div>
+              </div>
             </div>
           </div>
-        </>
+        )}
+      </div>
+
+      {/* Processing Overlay */}
+      {busy && (
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background/80 backdrop-blur-xl animate-in fade-in duration-500">
+          <div className="relative mb-6">
+             <div className="h-20 w-20 animate-spin rounded-full border-4 border-primary/10 border-t-primary" />
+             <Scissors className="absolute inset-0 m-auto h-8 w-8 text-primary animate-pulse" />
+          </div>
+          <h2 className="text-xl font-black tracking-tighter uppercase">Compiling Page Streams</h2>
+          <p className="mt-2 text-[10px] font-black tracking-[.25em] text-muted-foreground/40 uppercase">
+            Executing Precision Cuts locally
+          </p>
+        </div>
       )}
     </ToolPage>
   );
 }
+
