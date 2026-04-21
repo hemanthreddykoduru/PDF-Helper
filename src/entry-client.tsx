@@ -1,6 +1,5 @@
 import { RouterProvider } from '@tanstack/react-router'
-import { StartClient } from '@tanstack/react-start/client'
-import { createRoot, hydrateRoot } from 'react-dom/client'
+import { createRoot } from 'react-dom/client'
 import { getRouter } from './router'
 
 const router = getRouter()
@@ -14,26 +13,23 @@ async function init() {
     return;
   }
 
-  if (isCapacitor) {
-    console.log("Running in Capacitor Mode (SPA)...");
-    
-    // Clear any hydration flags to ensure a fresh SPA start
-    (window as any).__TSS_START_OPTIONS__ = undefined;
-    (window as any).__TANSTACK_ROUTER_HYDRATION__ = undefined;
+  // Pure SPA Mounting for ALL platforms.
+  // This resolves all 'Invariant failed' hydration errors by starting fresh.
+  console.log(`Running in ${isCapacitor ? "Capacitor" : "Web"} Mode (SPA Unification)...`);
+  
+  // Clear any potential hydration flags from old builds
+  (window as any).__TSS_START_OPTIONS__ = undefined;
+  (window as any).__TANSTACK_ROUTER_HYDRATION__ = undefined;
 
-    await router.load()
-    const root = createRoot(rootElement)
-    root.render(<RouterProvider router={router} />)
-  } else {
-    // Standard Web/Vercel Mode
-    console.log("Running in Web Mode (Standard Hydration)...");
-    hydrateRoot(rootElement, <StartClient />)
-  }
+  await router.load()
+  const root = createRoot(rootElement)
+  root.render(<RouterProvider router={router} />)
 }
 
 init().catch((err) => {
   console.error("Initialization failed:", err);
   if (typeof window !== 'undefined') {
-    alert("Init Error: " + (err.message || String(err)));
+    // Keep internal error logging silent in production unless critical
+    console.debug("Init Error details:", err);
   }
 });

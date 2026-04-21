@@ -1,23 +1,15 @@
-import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import { Outlet, createRootRoute, HeadContent } from "@tanstack/react-router";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AppShell } from "@/components/AppShell";
 import "../styles.css";
 
+// Minimal NotFound component
 function NotFoundComponent() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold">Tool not found</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          The page you're looking for doesn't exist.
-        </p>
-        <Link
-          to="/"
-          className="mt-6 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-        >
-          Go home
-        </Link>
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 text-center">
+      <div>
+        <h1 className="text-4xl font-bold">404</h1>
+        <p className="mt-2 text-muted-foreground">Page not found</p>
       </div>
     </div>
   );
@@ -40,11 +32,13 @@ function RootComponent() {
   );
 
   if (isCapacitor) {
-    // Mobile APK Mode: Minimal shell to avoid hydration crashes
+    // APK/Capacitor: Direct shell, no wrapping HTML tags
     return content;
   }
 
-  // Web/Vercel Mode: Full HTML shell for SSR and SEO
+  // Web/Vercel: Naked shell for SPA mounting. 
+  // We keep the structural tags for SSR shells but remove <Scripts/> 
+  // because we are mounting from scratch in entry-client.tsx.
   return (
     <html lang="en">
       <head>
@@ -52,7 +46,6 @@ function RootComponent() {
       </head>
       <body>
         {content}
-        <Scripts />
       </body>
     </html>
   );
