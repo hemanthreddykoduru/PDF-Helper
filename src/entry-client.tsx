@@ -12,8 +12,9 @@ async function init() {
   }
 
   try {
-    console.log("[STEP 1] Fetching Singleton Router...");
-    const router = getRouter();
+    console.log("[STEP 1] Fetching Async Singleton Router...");
+    // The getRouter function is now async to break circular dependencies
+    const router = await getRouter();
 
     console.log("[STEP 2] Loading Router Routes...");
     // Clear any potential hydration flags that might trigger 'Invariant'
@@ -30,7 +31,6 @@ async function init() {
   } catch (err: any) {
     console.error("[FATAL ERROR] Initialization Failed:", err);
     if (typeof window !== 'undefined') {
-      // Use a slightly more helpful alert for debugging
       alert("App Crash: " + (err.message || "Unknown error") + "\nCheck Console for stack trace.");
     }
   }

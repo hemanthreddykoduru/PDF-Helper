@@ -1,5 +1,4 @@
 import { createRouter, useRouter, createHashHistory } from "@tanstack/react-router";
-import { routeTree } from "./routeTree.gen";
 
 function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
@@ -24,14 +23,18 @@ function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => vo
 // Singleton storage to prevent multiple initialization
 let routerInstance: ReturnType<typeof createRouter> | null = null;
 
-export const getRouter = () => {
+export const getRouter = async () => {
   if (routerInstance) return routerInstance;
+
+  // BREAK THE CIRCULAR DEPENDENCY:
+  // Dynamically import the routeTree so it's fully loaded before this function runs.
+  const { routeTree } = await import("./routeTree.gen");
 
   const isCapacitor = typeof window !== "undefined" && (window as any).Capacitor;
   const history = typeof window !== "undefined" && isCapacitor ? createHashHistory() : undefined;
   
   if (typeof window !== "undefined") {
-    console.log("Initializing Singleton Router. Mode:", isCapacitor ? "Capacitor (Hash)" : "Web (Browser)");
+    console.log("Initializing Async Singleton Router. Mode:", isCapacitor ? "Capacitor (Hash)" : "Web (Browser)");
   }
 
   routerInstance = createRouter({
@@ -46,8 +49,9 @@ export const getRouter = () => {
   return routerInstance;
 };
 
+// Types are still safe for the global registration
 declare module "@tanstack/react-router" {
   interface Register {
-    router: ReturnType<typeof getRouter>;
+    router: Awaited<ReturnType<typeof getRouter>>;
   }
 }
