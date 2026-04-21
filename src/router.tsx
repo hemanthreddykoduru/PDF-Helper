@@ -34,12 +34,13 @@ export const getRouter = async () => {
   const history = typeof window !== "undefined" && isCapacitor ? createHashHistory() : undefined;
   
   if (typeof window !== "undefined") {
-    console.log("Initializing Async Singleton Router. Mode:", isCapacitor ? "Capacitor (Hash)" : "Web (Browser)");
+    console.log("Initializing Singleton Router. Mode:", isCapacitor ? "Capacitor (Hash)" : "Web (Browser)");
   }
 
   routerInstance = createRouter({
     routeTree,
     history,
+    basepath: "/", // Explicitly set to absolute root to prevent 'Invariant failed'
     context: {},
     scrollRestoration: true,
     defaultPreloadStaleTime: 0,

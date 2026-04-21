@@ -8,8 +8,9 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
   vite: {
-    // On Vercel, we need absolute paths (/) for SSR to work correctly.
-    // In Capacitor (Mobile), we need relative paths (./) for the filesystem WebView.
-    base: process.env.VERCEL ? "/" : "./",
+    // We use an absolute base path ('/') to satisfy the TanStack Router's internal requirements.
+    // Our custom 'generate-index-html.cjs' script handles the relative path conversion
+    // needed for the Capacitor/Mobile build after the main build finishes.
+    base: "/",
   },
 });
