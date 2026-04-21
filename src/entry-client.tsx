@@ -27,7 +27,7 @@ async function init() {
   } else {
     // Standard Web/Vercel Mode
     console.log("Running in Web Mode (Standard Hydration)...");
-    hydrateRoot(rootElement, <StartClient router={router} />)
+    hydrateRoot(rootElement, <StartClient />)
   }
 }
 
