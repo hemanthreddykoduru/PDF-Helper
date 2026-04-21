@@ -1,0 +1,6 @@
+{
+  "version": "1.2.4",
+  "build": 45,
+  "url": "https://paper-cut-craft-main.vercel.app/pdf-helper.apk",
+  "notes": "History UI restoration and native download stability fixes."
+}

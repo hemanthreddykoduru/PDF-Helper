@@ -24,6 +24,7 @@ import { TOOLS } from "@/lib/tools";
 import { Logo } from "@/components/Logo";
 import { useTheme } from "@/components/ThemeProvider";
 import { cn } from "@/lib/utils";
+import { useUpdateCheck } from "@/hooks/useUpdateCheck";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Combine,
@@ -46,6 +47,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const { theme, toggle } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Automated Update Engine
+  useUpdateCheck();
 
   // Keyboard shortcuts
   useEffect(() => {
