@@ -1,215 +1,167 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { Type } from "lucide-react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
+import { Droplet, ChevronLeft, Type } from "lucide-react";
 import { FileDropzone } from "@/components/FileDropzone";
 import { Button } from "@/components/PKButton";
 import { PageHeader, ToolPage } from "@/components/PageHeader";
-import { addWatermark } from "@/utils/pdfHelpers";
-import { downloadBlob, stripExtension, addRecent } from "@/utils/fileUtils";
-import { cn } from "@/lib/utils";
+import { ResultScreen } from "@/components/ResultScreen";
+import { watermarkPdf } from "@/utils/pdfHelpers"; // Corrected name
+import { formatBytes, stripExtension, addRecent } from "@/utils/fileUtils";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/watermark")({
-  head: () => ({
-    meta: [
-      { title: "Watermark PDF — PaperKnife" },
-      { name: "description", content: "Overlay a text watermark on every page." },
-    ],
-  }),
   component: WatermarkTool,
 });
 
-function hexToRgb(hex: string) {
-  const m = hex.replace("#", "");
-  return {
-    r: parseInt(m.slice(0, 2), 16),
-    g: parseInt(m.slice(2, 4), 16),
-    b: parseInt(m.slice(4, 6), 16),
-  };
-}
-
 function WatermarkTool() {
-  const [file, setFile] = useState<File | null>(null);
+  const navigate = useNavigate();
+  const [fileData, setFileData] = useState<{ file: File; bytes: Uint8Array } | null>(null);
   const [text, setText] = useState("CONFIDENTIAL");
-  const [fontSize, setFontSize] = useState(48);
-  const [opacity, setOpacity] = useState(0.25);
-  const [angle, setAngle] = useState(45);
-  const [color, setColor] = useState("#e63946");
-  const [position, setPosition] = useState<"center" | "diagonal" | "tiled">("diagonal");
+  const [opacity, setOpacity] = useState(0.4);
   const [busy, setBusy] = useState(false);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [result, setResult] = useState<{ bytes: Uint8Array; name: string } | null>(null);
 
-  // Simple preview by drawing on canvas
-  useEffect(() => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 420;
-    canvas.height = 560;
-    const ctx = canvas.getContext("2d")!;
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    // Fake page content
-    ctx.fillStyle = "#e5e7eb";
-    for (let y = 60; y < canvas.height - 60; y += 20) {
-      ctx.fillRect(40, y, canvas.width - 80 - Math.random() * 80, 6);
-    }
-    const draw = (x: number, y: number, rot: number) => {
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate((rot * Math.PI) / 180);
-      ctx.globalAlpha = opacity;
-      ctx.fillStyle = color;
-      ctx.font = `bold ${fontSize}px Inter, sans-serif`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(text || " ", 0, 0);
-      ctx.restore();
-    };
-    if (position === "tiled") {
-      const step = fontSize * 3;
-      for (let y = 0; y < canvas.height + step; y += step) {
-        for (let x = -step; x < canvas.width + step; x += step) {
-          draw(x, y, angle);
-        }
-      }
-    } else if (position === "diagonal") {
-      draw(canvas.width / 2, canvas.height / 2, angle);
-    } else {
-      draw(canvas.width / 2, canvas.height / 2, 0);
-    }
-    setPreview(canvas.toDataURL("image/png"));
-  }, [text, fontSize, opacity, angle, color, position]);
+  const onFiles = async (files: File[]) => {
+    if (!files[0]) return;
+    const bytes = new Uint8Array(await files[0].arrayBuffer());
+    setFileData({ file: files[0], bytes });
+  };
 
   const run = async () => {
-    if (!file) return;
+    if (!fileData) return;
     setBusy(true);
     try {
-      const bytes = await addWatermark(file, {
-        text,
-        fontSize,
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // Corrected function call and options structure
+      const bytes = await watermarkPdf(fileData.file as any, text, { 
+        fontSize: 48,
         opacity,
-        angle,
-        color: hexToRgb(color),
-        position,
+        angle: 45,
+        color: { r: 128, g: 128, b: 128 },
+        position: "center"
       });
-      const name = `${stripExtension(file.name)}-watermarked.pdf`;
-      downloadBlob(bytes, name);
-      addRecent({ name, size: bytes.byteLength, operation: "Watermark" });
+      const name = `${stripExtension(fileData.file.name)}-watermarked.pdf`;
+      setResult({ bytes, name });
+      await addRecent({ name, size: bytes.byteLength, operation: "Watermark" }, bytes);
+      toast.success("Security overlay applied successfully.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Watermark failed: Overlay synthesis error.");
     } finally {
       setBusy(false);
     }
   };
 
+  const reset = () => {
+    setFileData(null);
+    setResult(null);
+  };
+
   return (
     <ToolPage>
-      <PageHeader
-        title="Watermark"
-        description="Add a custom text watermark to every page. Preview before applying."
-        icon={<Type className="h-5 w-5" />}
-      />
+      <div className="mx-auto max-w-2xl px-5 pt-4 pb-32">
+        <div className="flex items-center gap-4 mb-8">
+           <button onClick={() => navigate({ to: "/" })} className="h-10 w-10 flex items-center justify-center rounded-full bg-surface-elevated text-foreground/60 active:scale-90 transition-all">
+              <ChevronLeft className="h-6 w-6" />
+           </button>
+           <h1 className="text-xl font-black tracking-tight uppercase">Watermark</h1>
+        </div>
 
-      {!file && <FileDropzone onFiles={(f) => setFile(f[0])} />}
+        {!result ? (
+          <>
+            <PageHeader
+               title="Watermark PDF"
+               description="Apply high-fidelity security overlays to your document."
+               icon={<Droplet className="h-5 w-5" />}
+            />
 
-      {file && (
-        <>
-          <div className="mb-4 flex items-center justify-between rounded-lg border border-border bg-surface px-3 py-2.5 text-sm">
-            <span className="truncate font-medium">{file.name}</span>
-            <button onClick={() => setFile(null)} className="text-xs text-muted-foreground hover:text-primary">
-              Change
-            </button>
-          </div>
-
-          <div className="grid gap-5 lg:grid-cols-2">
-            <div className="space-y-4 rounded-lg border border-border bg-surface p-5">
-              <div>
-                <label className="mb-1 block text-sm font-medium">Text</label>
-                <input
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            {!fileData && (
+              <div className="mt-8">
+                <FileDropzone 
+                  onFiles={onFiles} 
+                  label="Drop PDF to watermark"
+                  hint="Files processed locally — privacy guaranteed"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-sm font-medium">Font size: {fontSize}</label>
-                  <input
-                    type="range"
-                    min={16}
-                    max={120}
-                    value={fontSize}
-                    onChange={(e) => setFontSize(+e.target.value)}
-                    className="w-full accent-primary"
-                  />
+            )}
+
+            {fileData && (
+              <div className="mt-8 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="flex items-center justify-between rounded-[28px] border border-border/50 bg-surface p-6">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-base font-black tracking-tight">{fileData.file.name}</div>
+                    <div className="text-[10px] font-bold text-muted-foreground/60 uppercase">
+                      Target Document — {formatBytes(fileData.file.size)}
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => setFileData(null)}>Change</Button>
                 </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium">Angle: {angle}°</label>
-                  <input
-                    type="range"
-                    min={-90}
-                    max={90}
-                    value={angle}
-                    onChange={(e) => setAngle(+e.target.value)}
-                    className="w-full accent-primary"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium">Opacity: {Math.round(opacity * 100)}%</label>
-                  <input
-                    type="range"
-                    min={5}
-                    max={100}
-                    value={opacity * 100}
-                    onChange={(e) => setOpacity(+e.target.value / 100)}
-                    className="w-full accent-primary"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium">Color</label>
-                  <input
-                    type="color"
-                    value={color}
-                    onChange={(e) => setColor(e.target.value)}
-                    className="h-10 w-full cursor-pointer rounded-md border border-border bg-background"
-                  />
+
+                <div className="space-y-6 rounded-[28px] border border-border bg-surface p-6 sm:p-8 shadow-sm">
+                   <h3 className="text-[10px] font-black tracking-widest text-muted-foreground/60 uppercase">Overlay Design</h3>
+                   
+                   <div className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-black tracking-widest text-muted-foreground/80 uppercase">Watermark Text</label>
+                      <div className="relative">
+                        <Type className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/30" />
+                        <input
+                          type="text"
+                          value={text}
+                          onChange={(e) => setText(e.target.value)}
+                          className="h-12 w-full rounded-xl border border-border bg-background pl-11 pr-4 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          placeholder="e.g. CONFIDENTIAL"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-3">
+                       <div className="flex items-center justify-between">
+                          <label className="text-[9px] font-black tracking-widest text-muted-foreground/80 uppercase">Opacity Intensity</label>
+                          <span className="text-[10px] font-black text-primary">{(opacity * 100).toFixed(0)}%</span>
+                       </div>
+                       <input 
+                          type="range" 
+                          min="0.1" 
+                          max="1.0" 
+                          step="0.1" 
+                          value={opacity}
+                          onChange={(e) => setOpacity(parseFloat(e.target.value))}
+                          className="w-full accent-primary"
+                       />
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <Button onClick={run} loading={busy} className="w-full h-14 rounded-2xl shadow-lg">
+                      Apply Overlay
+                    </Button>
+                  </div>
                 </div>
               </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">Position</label>
-                <div className="flex gap-2">
-                  {(["center", "diagonal", "tiled"] as const).map((p) => (
-                    <button
-                      key={p}
-                      onClick={() => setPosition(p)}
-                      className={cn(
-                        "flex-1 rounded-md border px-3 py-1.5 text-xs font-medium capitalize",
-                        position === p
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border hover:border-primary/50",
-                      )}
-                    >
-                      {p}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
+            )}
+          </>
+        ) : (
+          <ResultScreen 
+             result={result} 
+             onReset={reset} 
+             operationLabel="Secured Document"
+             successMessage="Security Overlay Applied"
+          />
+        )}
+      </div>
 
-            <div className="rounded-lg border border-border bg-surface p-5">
-              <div className="mb-2 text-sm font-medium">Preview</div>
-              {preview && (
-                <img
-                  src={preview}
-                  alt="Watermark preview"
-                  className="w-full rounded-md border border-border"
-                />
-              )}
-            </div>
+       {busy && (
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background/90 backdrop-blur-2xl animate-in fade-in duration-500">
+          <div className="relative mb-8">
+             <div className="h-24 w-24 animate-spin rounded-full border-4 border-primary/5 border-t-primary" />
+             <Droplet className="absolute inset-0 m-auto h-10 w-10 text-primary animate-pulse" />
           </div>
-
-          <div className="mt-6 flex justify-end">
-            <Button onClick={run} loading={busy} disabled={!text.trim()}>
-              Apply watermark & download
-            </Button>
-          </div>
-        </>
+          <h2 className="text-2xl font-black tracking-tighter uppercase px-6 text-center">Overlay Synthesis</h2>
+          <p className="mt-2 text-[10px] font-black tracking-[.3em] text-muted-foreground/40 uppercase">
+            Embedding visual watermark locally
+          </p>
+        </div>
       )}
     </ToolPage>
   );

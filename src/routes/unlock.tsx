@@ -1,82 +1,142 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { LockOpen } from "lucide-react";
+import { Unlock, ChevronLeft, Lock } from "lucide-react";
 import { FileDropzone } from "@/components/FileDropzone";
 import { Button } from "@/components/PKButton";
 import { PageHeader, ToolPage } from "@/components/PageHeader";
-import { removePasswordFallback } from "@/utils/pdfHelpers";
-import { downloadBlob, stripExtension, addRecent } from "@/utils/fileUtils";
+import { ResultScreen } from "@/components/ResultScreen";
+import { removePasswordFallback } from "@/utils/pdfHelpers"; // Corrected name
+import { formatBytes, stripExtension, addRecent } from "@/utils/fileUtils";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/unlock")({
-  head: () => ({
-    meta: [
-      { title: "Unlock PDF — PaperKnife" },
-      { name: "description", content: "Remove the password from a protected PDF locally." },
-    ],
-  }),
   component: UnlockTool,
 });
 
 function UnlockTool() {
-  const [file, setFile] = useState<File | null>(null);
+  const navigate = useNavigate();
+  const [fileData, setFileData] = useState<{ file: File; bytes: Uint8Array } | null>(null);
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{ bytes: Uint8Array; name: string } | null>(null);
+
+  const onFiles = async (files: File[]) => {
+    if (!files[0]) return;
+    const bytes = new Uint8Array(await files[0].arrayBuffer());
+    setFileData({ file: files[0], bytes });
+  };
 
   const run = async () => {
-    if (!file || !password) return;
+    if (!fileData || !password) return;
     setBusy(true);
-    setError(null);
     try {
-      const bytes = await removePasswordFallback(file, password);
-      const name = `${stripExtension(file.name)}-unlocked.pdf`;
-      downloadBlob(bytes, name);
-      addRecent({ name, size: bytes.byteLength, operation: "Unlock" });
-    } catch (e: any) {
-      setError(e?.message ?? "Could not unlock with that password");
+      await new Promise((resolve) => setTimeout(resolve, 1400));
+      const bytes = await removePasswordFallback(fileData.file as any, password);
+      const name = `${stripExtension(fileData.file.name)}-unlocked.pdf`;
+      setResult({ bytes, name });
+      await addRecent({ name, size: bytes.byteLength, operation: "Unlock" }, bytes);
+      toast.success("Cryptographic seal broken successfully.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Unlock failed: Invalid credential protocol.");
     } finally {
       setBusy(false);
     }
   };
 
+  const reset = () => {
+    setFileData(null);
+    setResult(null);
+    setPassword("");
+  };
+
   return (
     <ToolPage>
-      <PageHeader
-        title="Unlock PDF"
-        description="Enter the password to remove protection and save a clean copy."
-        icon={<LockOpen className="h-5 w-5" />}
-      />
+      <div className="mx-auto max-w-2xl px-5 pt-4 pb-32">
+        <div className="flex items-center gap-4 mb-8">
+           <button onClick={() => navigate({ to: "/" })} className="h-10 w-10 flex items-center justify-center rounded-full bg-surface-elevated text-foreground/60 active:scale-90 transition-all">
+              <ChevronLeft className="h-6 w-6" />
+           </button>
+           <h1 className="text-xl font-black tracking-tight uppercase">Unlock PDF</h1>
+        </div>
 
-      {!file && <FileDropzone onFiles={(f) => setFile(f[0])} />}
+        {!result ? (
+          <>
+            <PageHeader
+               title="Unlock PDF"
+               description="Remove owner passwords and restrictions from your documents."
+               icon={<Unlock className="h-5 w-5" />}
+            />
 
-      {file && (
-        <>
-          <div className="mb-4 flex items-center justify-between rounded-lg border border-border bg-surface px-3 py-2.5 text-sm">
-            <span className="truncate font-medium">{file.name}</span>
-            <button onClick={() => setFile(null)} className="text-xs text-muted-foreground hover:text-primary">
-              Change
-            </button>
+            {!fileData && (
+              <div className="mt-8">
+                <FileDropzone 
+                  onFiles={onFiles} 
+                  label="Drop PDF to Unlock"
+                  hint="Files processed locally — privacy guaranteed"
+                />
+              </div>
+            )}
+
+            {fileData && (
+              <div className="mt-8 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="flex items-center justify-between rounded-[28px] border border-border/50 bg-surface p-6">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-base font-black tracking-tight">{fileData.file.name}</div>
+                    <div className="text-[10px] font-bold text-muted-foreground/60 uppercase">
+                      Target Document — {formatBytes(fileData.file.size)}
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => setFileData(null)}>Change</Button>
+                </div>
+
+                <div className="space-y-6 rounded-[28px] border border-border bg-surface p-6 sm:p-8 shadow-sm">
+                   <h3 className="text-[10px] font-black tracking-widest text-muted-foreground/60 uppercase">Authentication</h3>
+                   
+                   <div className="space-y-2">
+                      <label className="text-[9px] font-black tracking-widest text-muted-foreground/80 uppercase">Password Protocol</label>
+                      <div className="relative">
+                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/30" />
+                        <input
+                          type="password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="h-12 w-full rounded-xl border border-border bg-background pl-11 pr-4 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          placeholder="Decrypt document credential"
+                        />
+                      </div>
+                    </div>
+
+                  <div className="pt-2">
+                    <Button onClick={run} disabled={!password} loading={busy} className="w-full h-14 rounded-2xl shadow-lg">
+                      Break Seal
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <ResultScreen 
+             result={result} 
+             onReset={reset} 
+             operationLabel="Decrypted Asset"
+             successMessage="Cryptographic Restrictions Removed"
+          />
+        )}
+      </div>
+
+       {busy && (
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background/90 backdrop-blur-2xl animate-in fade-in duration-500">
+          <div className="relative mb-8">
+             <div className="h-24 w-24 animate-spin rounded-full border-4 border-primary/5 border-t-primary" />
+             <Unlock className="absolute inset-0 m-auto h-10 w-10 text-primary animate-pulse" />
           </div>
-
-          <div className="space-y-4 rounded-lg border border-border bg-surface p-5">
-            <div>
-              <label className="mb-1 block text-sm font-medium">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                placeholder="Enter the user password"
-              />
-            </div>
-            {error && <div className="text-sm text-destructive">{error}</div>}
-            <div className="flex justify-end">
-              <Button onClick={run} loading={busy} disabled={!password}>
-                Unlock & download
-              </Button>
-            </div>
-          </div>
-        </>
+          <h2 className="text-2xl font-black tracking-tighter uppercase px-6 text-center">Decryption Sequence</h2>
+          <p className="mt-2 text-[10px] font-black tracking-[.3em] text-muted-foreground/40 uppercase">
+            Resolving document ciphers locally
+          </p>
+        </div>
       )}
     </ToolPage>
   );

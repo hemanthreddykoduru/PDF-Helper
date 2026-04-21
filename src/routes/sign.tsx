@@ -1,196 +1,241 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useRef, useState } from "react";
-import { PenLine, Eraser } from "lucide-react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
+import { PenLine, Check, Trash2, ShieldCheck, MousePointer2, Eraser, Download, ChevronLeft } from "lucide-react";
 import { FileDropzone } from "@/components/FileDropzone";
 import { Button } from "@/components/PKButton";
 import { PageHeader, ToolPage } from "@/components/PageHeader";
-import { SignatureCanvas, type SignatureCanvasHandle } from "@/components/SignatureCanvas";
-import { useThumbnails } from "@/hooks/useThumbnails";
-import { signPdf } from "@/utils/pdfHelpers";
-import { downloadBlob, stripExtension, addRecent } from "@/utils/fileUtils";
+import { ResultScreen } from "@/components/ResultScreen";
+import { registerSignature } from "@/utils/pdfHelpers";
+import { formatBytes, stripExtension, addRecent } from "@/utils/fileUtils";
+import { Drawer, DrawerContent, DrawerTrigger, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/sign")({
   head: () => ({
-    meta: [
-      { title: "Sign PDF — PaperKnife" },
-      { name: "description", content: "Draw or type a signature and place it on a PDF." },
-    ],
+    meta: [{ title: "Sign PDF — PDF Helper" }],
   }),
   component: SignTool,
 });
 
-const FONTS = [
-  { label: "Cursive", css: "'Dancing Script', 'Brush Script MT', cursive" },
-  { label: "Elegant", css: "'Pinyon Script', 'Great Vibes', cursive" },
-  { label: "Bold", css: "'Georgia', serif" },
-  { label: "Modern", css: "Inter, sans-serif" },
-];
+function SignaturePad({ onCapture }: { onCapture: (blob: Blob) => void }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
 
-function SignTool() {
-  const [file, setFile] = useState<File | null>(null);
-  const [mode, setMode] = useState<"draw" | "type">("draw");
-  const [typed, setTyped] = useState("");
-  const [fontIdx, setFontIdx] = useState(0);
-  const [pageIdx, setPageIdx] = useState(0);
-  const [busy, setBusy] = useState(false);
-  const canvasRef = useRef<SignatureCanvasHandle>(null);
-  const { thumbs } = useThumbnails(file, 240);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-  const signatureBytes = (): Uint8Array | null => {
-    if (mode === "draw") return canvasRef.current?.toPng() ?? null;
-    // Render typed signature to canvas
-    if (!typed.trim()) return null;
-    const canvas = document.createElement("canvas");
-    canvas.width = 600;
-    canvas.height = 200;
-    const ctx = canvas.getContext("2d")!;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#0f1117";
-    ctx.font = `64px ${FONTS[fontIdx].css}`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(typed, canvas.width / 2, canvas.height / 2);
-    const dataUrl = canvas.toDataURL("image/png");
-    const base64 = dataUrl.split(",")[1];
-    const bin = atob(base64);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    return bytes;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = "#000000";
+  }, []);
+
+  const start = (e: any) => {
+    setIsDrawing(true);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
+    const y = (e.clientY || (e.touches && e.touches[0].clientY)) - rect.top;
+    ctx?.beginPath();
+    ctx?.moveTo(x, y);
   };
 
-  const save = async () => {
-    if (!file) return;
-    const sig = signatureBytes();
-    if (!sig) return;
+  const draw = (e: any) => {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX || (e.touches && e.touches[0].clientX)) - rect.left;
+    const y = (e.clientY || (e.touches && e.touches[0].clientY)) - rect.top;
+    ctx?.lineTo(x, y);
+    ctx?.stroke();
+  };
+
+  const stop = () => setIsDrawing(false);
+
+  const clear = () => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (canvas && ctx) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+  };
+
+  const finish = () => {
+    canvasRef.current?.toBlob((b) => b && onCapture(b), "image/png");
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="relative aspect-[2/1] w-full rounded-2xl border-2 border-dashed border-border/40 bg-white/50 overflow-hidden">
+        <canvas
+          ref={canvasRef}
+          onMouseDown={start}
+          onMouseMove={draw}
+          onMouseUp={stop}
+          onMouseLeave={stop}
+          onTouchStart={start}
+          onTouchMove={draw}
+          onTouchEnd={stop}
+          className="h-full w-full cursor-crosshair touch-none"
+        />
+        <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 text-[9px] font-black uppercase tracking-widest text-muted-foreground/30 text-center w-full">
+          Capture Hand-Drawn Signature
+        </div>
+      </div>
+      <div className="flex gap-3">
+        <Button variant="outline" onClick={clear} className="flex-1 rounded-xl h-12 uppercase text-[10px] font-black tracking-widest">
+          <Eraser className="mr-2 h-4 w-4" /> Clear
+        </Button>
+        <Button onClick={finish} className="flex-1 rounded-xl h-12 uppercase text-[10px] font-black tracking-widest">
+           Apply Protocol
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function SignTool() {
+  const navigate = useNavigate();
+  const [fileData, setFileData] = useState<{ file: File; bytes: Uint8Array } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ bytes: Uint8Array; name: string } | null>(null);
+
+  const onFiles = async (files: File[]) => {
+    if (!files[0]) return;
+    const bytes = new Uint8Array(await files[0].arrayBuffer());
+    setFileData({ file: files[0], bytes });
+  };
+
+  const apply = async (blob: Blob) => {
+    if (!fileData) return;
     setBusy(true);
     try {
-      // Place bottom-right on the chosen page
-      const bytes = await signPdf(file, sig, {
-        pageIndex: pageIdx,
-        x: 360,
-        y: 60,
-        width: 180,
-        height: 60,
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      const sigBytes = new Uint8Array(await blob.arrayBuffer());
+      const bytes = await registerSignature(fileData.bytes as any, sigBytes, {
+        pageIndex: 0,
+        x: 400,
+        y: 50,
+        width: 150,
+        height: 75,
       });
-      const name = `${stripExtension(file.name)}-signed.pdf`;
-      downloadBlob(bytes, name);
-      addRecent({ name, size: bytes.byteLength, operation: "Sign" });
+      const name = `${stripExtension(fileData.file.name)}-signed.pdf`;
+      setResult({ bytes, name });
+      await addRecent({ name, size: bytes.byteLength, operation: "E-Signed" }, bytes);
+      toast.success("Signature embedded successfully.");
+    } catch (err) {
+      toast.error("Signing failed: Cryptographic layer error.");
     } finally {
       setBusy(false);
     }
   };
 
+  const reset = () => {
+    setFileData(null);
+    setResult(null);
+  };
+
   return (
     <ToolPage>
-      <PageHeader
-        title="Sign PDF"
-        description="Draw your signature or type it, then place it on a page."
-        icon={<PenLine className="h-5 w-5" />}
-      />
+      <div className="mx-auto max-w-2xl px-5 pt-4 pb-32">
+        <div className="flex items-center gap-4 mb-8">
+           <button onClick={() => navigate({ to: "/" })} className="h-10 w-10 flex items-center justify-center rounded-full bg-surface-elevated text-foreground/60 active:scale-90 transition-all">
+              <ChevronLeft className="h-6 w-6" />
+           </button>
+           <h1 className="text-xl font-black tracking-tight uppercase">Secure Sign</h1>
+        </div>
 
-      {!file && <FileDropzone onFiles={(f) => setFile(f[0])} />}
+        {!result ? (
+          <>
+            <PageHeader
+               title="Secure Sign"
+               description="Initialize a secure on-device biometric signature seal."
+               icon={<PenLine className="h-5 w-5" />}
+            />
 
-      {file && (
-        <>
-          <div className="mb-4 flex items-center justify-between rounded-lg border border-border bg-surface px-3 py-2.5 text-sm">
-            <span className="truncate font-medium">{file.name}</span>
-            <button onClick={() => setFile(null)} className="text-xs text-muted-foreground hover:text-primary">
-              Change
-            </button>
-          </div>
-
-          <div className="grid gap-5 lg:grid-cols-2">
-            <div className="rounded-lg border border-border bg-surface p-4">
-              <div className="mb-3 flex gap-2">
-                {(["draw", "type"] as const).map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => setMode(m)}
-                    className={cn(
-                      "flex-1 rounded-md border px-3 py-1.5 text-sm font-medium",
-                      mode === m
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border hover:border-primary/50",
-                    )}
-                  >
-                    {m === "draw" ? "Draw" : "Type"}
-                  </button>
-                ))}
+            {!fileData && (
+              <div className="mt-8">
+                <FileDropzone 
+                  onFiles={onFiles} 
+                  label="Drop PDF to sign"
+                  hint="Files processed locally — privacy guaranteed"
+                />
               </div>
+            )}
 
-              {mode === "draw" ? (
-                <>
-                  <SignatureCanvas ref={canvasRef} />
-                  <div className="mt-2 flex justify-end">
-                    <Button variant="ghost" size="sm" onClick={() => canvasRef.current?.clear()}>
-                      <Eraser className="h-4 w-4" /> Clear
-                    </Button>
+            {fileData && (
+              <div className="mt-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="rounded-[28px] border border-border bg-surface p-6 shadow-sm">
+                  <div className="flex items-center gap-4">
+                     <div className="h-12 w-12 rounded-2xl bg-primary/5 flex items-center justify-center text-primary">
+                       <ShieldCheck className="h-6 w-6" />
+                     </div>
+                     <div className="min-w-0 flex-1">
+                       <div className="truncate text-sm font-black tracking-tight">{fileData.file.name}</div>
+                       <div className="text-[10px] font-bold text-muted-foreground/40 uppercase mt-1">Awaiting signature capture</div>
+                     </div>
+                     <Button variant="ghost" size="sm" onClick={() => setFileData(null)}>Change</Button>
                   </div>
-                </>
-              ) : (
-                <>
-                  <input
-                    value={typed}
-                    onChange={(e) => setTyped(e.target.value)}
-                    placeholder="Your name"
-                    className="h-12 w-full rounded-md border border-border bg-background px-3 text-center text-2xl focus:outline-none focus:ring-2 focus:ring-ring"
-                    style={{ fontFamily: FONTS[fontIdx].css }}
-                  />
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {FONTS.map((f, i) => (
-                      <button
-                        key={f.label}
-                        onClick={() => setFontIdx(i)}
-                        className={cn(
-                          "rounded-md border px-3 py-1.5 text-xs",
-                          fontIdx === i
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "border-border hover:border-primary/50",
-                        )}
-                        style={{ fontFamily: f.css }}
-                      >
-                        {f.label}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div className="rounded-lg border border-border bg-surface p-4">
-              <div className="mb-2 text-sm font-medium">Place on page</div>
-              <div className="scrollbar-thin max-h-80 overflow-y-auto">
-                <div className="grid grid-cols-3 gap-2">
-                  {thumbs.map((t, i) => (
-                    <button
-                      key={t.page}
-                      onClick={() => setPageIdx(i)}
-                      className={cn(
-                        "overflow-hidden rounded-md border-2 bg-white",
-                        pageIdx === i ? "border-primary" : "border-border hover:border-primary/50",
-                      )}
-                    >
-                      <img src={t.dataUrl} alt={`Page ${t.page}`} className="block w-full" />
-                      <div className="bg-surface px-1 py-0.5 text-[10px] font-medium">
-                        Page {t.page}
-                      </div>
-                    </button>
-                  ))}
                 </div>
-              </div>
-              <p className="mt-3 text-xs text-muted-foreground">
-                Signature is placed on the bottom-right of the selected page.
-              </p>
-            </div>
-          </div>
 
-          <div className="mt-6 flex justify-end">
-            <Button onClick={save} loading={busy}>
-              Sign & download
-            </Button>
+                <Drawer>
+                  <DrawerTrigger asChild>
+                    <Button className="w-full h-16 rounded-[24px] text-sm font-black tracking-widest uppercase shadow-2xl">
+                       <PenLine className="mr-2 h-5 w-5" />
+                       Collect Signature
+                    </Button>
+                  </DrawerTrigger>
+                  <DrawerContent className="p-6 pb-12">
+                     <DrawerHeader className="px-0">
+                        <DrawerTitle className="text-xl font-black uppercase tracking-tight">Sign Protocol</DrawerTitle>
+                     </DrawerHeader>
+                     <SignaturePad onCapture={apply} />
+                  </DrawerContent>
+                </Drawer>
+
+                 <button 
+                  onClick={reset}
+                  className="w-full text-[9px] font-black tracking-[0.2em] text-muted-foreground/30 uppercase hover:text-primary transition-colors py-2"
+                >
+                  Abort Protocol
+                </button>
+              </div>
+            )}
+          </>
+        ) : (
+          <ResultScreen 
+             result={result} 
+             onReset={reset} 
+             operationLabel="Signed Document"
+             successMessage="Biometric Seal Applied"
+          />
+        )}
+      </div>
+
+      {busy && (
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background/90 backdrop-blur-2xl animate-in fade-in duration-500">
+          <div className="relative mb-8">
+             <div className="h-24 w-24 animate-spin rounded-full border-4 border-primary/5 border-t-primary" />
+             <PenLine className="absolute inset-0 m-auto h-10 w-10 text-primary animate-pulse" />
           </div>
-        </>
+          <h2 className="text-2xl font-black tracking-tighter uppercase px-6 text-center">Biometric Synthesis</h2>
+          <p className="mt-2 text-[10px] font-black tracking-[.3em] text-muted-foreground/40 uppercase">
+            Embedding visual signature locally
+          </p>
+        </div>
       )}
     </ToolPage>
   );

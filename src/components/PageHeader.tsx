@@ -32,5 +32,5 @@ export function PageHeader({
 }
 
 export function ToolPage({ children }: { children: ReactNode }) {
-  return <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:py-10">{children}</div>;
+  return <div className="mx-auto max-w-5xl px-4 pt-[calc(1rem+var(--sat))] pb-10 lg:pt-10 lg:pb-12 sm:px-6">{children}</div>;
 }

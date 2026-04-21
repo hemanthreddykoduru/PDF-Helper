@@ -11,8 +11,10 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WatermarkRouteImport } from './routes/watermark'
 import { Route as UnlockRouteImport } from './routes/unlock'
+import { Route as ToolsRouteImport } from './routes/tools'
 import { Route as SplitRouteImport } from './routes/split'
 import { Route as SignRouteImport } from './routes/sign'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as PdfToImagesRouteImport } from './routes/pdf-to-images'
 import { Route as PageNumbersRouteImport } from './routes/page-numbers'
 import { Route as OrganizeRouteImport } from './routes/organize'
@@ -20,6 +22,7 @@ import { Route as OcrRouteImport } from './routes/ocr'
 import { Route as MetadataRouteImport } from './routes/metadata'
 import { Route as MergeRouteImport } from './routes/merge'
 import { Route as ImageToPdfRouteImport } from './routes/image-to-pdf'
+import { Route as HistoryRouteImport } from './routes/history'
 import { Route as EncryptRouteImport } from './routes/encrypt'
 import { Route as CompressRouteImport } from './routes/compress'
 import { Route as IndexRouteImport } from './routes/index'
@@ -34,6 +37,11 @@ const UnlockRoute = UnlockRouteImport.update({
   path: '/unlock',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ToolsRoute = ToolsRouteImport.update({
+  id: '/tools',
+  path: '/tools',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SplitRoute = SplitRouteImport.update({
   id: '/split',
   path: '/split',
@@ -42,6 +50,11 @@ const SplitRoute = SplitRouteImport.update({
 const SignRoute = SignRouteImport.update({
   id: '/sign',
   path: '/sign',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PdfToImagesRoute = PdfToImagesRouteImport.update({
@@ -79,6 +92,11 @@ const ImageToPdfRoute = ImageToPdfRouteImport.update({
   path: '/image-to-pdf',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HistoryRoute = HistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EncryptRoute = EncryptRouteImport.update({
   id: '/encrypt',
   path: '/encrypt',
@@ -99,6 +117,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/compress': typeof CompressRoute
   '/encrypt': typeof EncryptRoute
+  '/history': typeof HistoryRoute
   '/image-to-pdf': typeof ImageToPdfRoute
   '/merge': typeof MergeRoute
   '/metadata': typeof MetadataRoute
@@ -106,8 +125,10 @@ export interface FileRoutesByFullPath {
   '/organize': typeof OrganizeRoute
   '/page-numbers': typeof PageNumbersRoute
   '/pdf-to-images': typeof PdfToImagesRoute
+  '/settings': typeof SettingsRoute
   '/sign': typeof SignRoute
   '/split': typeof SplitRoute
+  '/tools': typeof ToolsRoute
   '/unlock': typeof UnlockRoute
   '/watermark': typeof WatermarkRoute
 }
@@ -115,6 +136,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/compress': typeof CompressRoute
   '/encrypt': typeof EncryptRoute
+  '/history': typeof HistoryRoute
   '/image-to-pdf': typeof ImageToPdfRoute
   '/merge': typeof MergeRoute
   '/metadata': typeof MetadataRoute
@@ -122,8 +144,10 @@ export interface FileRoutesByTo {
   '/organize': typeof OrganizeRoute
   '/page-numbers': typeof PageNumbersRoute
   '/pdf-to-images': typeof PdfToImagesRoute
+  '/settings': typeof SettingsRoute
   '/sign': typeof SignRoute
   '/split': typeof SplitRoute
+  '/tools': typeof ToolsRoute
   '/unlock': typeof UnlockRoute
   '/watermark': typeof WatermarkRoute
 }
@@ -132,6 +156,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/compress': typeof CompressRoute
   '/encrypt': typeof EncryptRoute
+  '/history': typeof HistoryRoute
   '/image-to-pdf': typeof ImageToPdfRoute
   '/merge': typeof MergeRoute
   '/metadata': typeof MetadataRoute
@@ -139,8 +164,10 @@ export interface FileRoutesById {
   '/organize': typeof OrganizeRoute
   '/page-numbers': typeof PageNumbersRoute
   '/pdf-to-images': typeof PdfToImagesRoute
+  '/settings': typeof SettingsRoute
   '/sign': typeof SignRoute
   '/split': typeof SplitRoute
+  '/tools': typeof ToolsRoute
   '/unlock': typeof UnlockRoute
   '/watermark': typeof WatermarkRoute
 }
@@ -150,6 +177,7 @@ export interface FileRouteTypes {
     | '/'
     | '/compress'
     | '/encrypt'
+    | '/history'
     | '/image-to-pdf'
     | '/merge'
     | '/metadata'
@@ -157,8 +185,10 @@ export interface FileRouteTypes {
     | '/organize'
     | '/page-numbers'
     | '/pdf-to-images'
+    | '/settings'
     | '/sign'
     | '/split'
+    | '/tools'
     | '/unlock'
     | '/watermark'
   fileRoutesByTo: FileRoutesByTo
@@ -166,6 +196,7 @@ export interface FileRouteTypes {
     | '/'
     | '/compress'
     | '/encrypt'
+    | '/history'
     | '/image-to-pdf'
     | '/merge'
     | '/metadata'
@@ -173,8 +204,10 @@ export interface FileRouteTypes {
     | '/organize'
     | '/page-numbers'
     | '/pdf-to-images'
+    | '/settings'
     | '/sign'
     | '/split'
+    | '/tools'
     | '/unlock'
     | '/watermark'
   id:
@@ -182,6 +215,7 @@ export interface FileRouteTypes {
     | '/'
     | '/compress'
     | '/encrypt'
+    | '/history'
     | '/image-to-pdf'
     | '/merge'
     | '/metadata'
@@ -189,8 +223,10 @@ export interface FileRouteTypes {
     | '/organize'
     | '/page-numbers'
     | '/pdf-to-images'
+    | '/settings'
     | '/sign'
     | '/split'
+    | '/tools'
     | '/unlock'
     | '/watermark'
   fileRoutesById: FileRoutesById
@@ -199,6 +235,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CompressRoute: typeof CompressRoute
   EncryptRoute: typeof EncryptRoute
+  HistoryRoute: typeof HistoryRoute
   ImageToPdfRoute: typeof ImageToPdfRoute
   MergeRoute: typeof MergeRoute
   MetadataRoute: typeof MetadataRoute
@@ -206,8 +243,10 @@ export interface RootRouteChildren {
   OrganizeRoute: typeof OrganizeRoute
   PageNumbersRoute: typeof PageNumbersRoute
   PdfToImagesRoute: typeof PdfToImagesRoute
+  SettingsRoute: typeof SettingsRoute
   SignRoute: typeof SignRoute
   SplitRoute: typeof SplitRoute
+  ToolsRoute: typeof ToolsRoute
   UnlockRoute: typeof UnlockRoute
   WatermarkRoute: typeof WatermarkRoute
 }
@@ -228,6 +267,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UnlockRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tools': {
+      id: '/tools'
+      path: '/tools'
+      fullPath: '/tools'
+      preLoaderRoute: typeof ToolsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/split': {
       id: '/split'
       path: '/split'
@@ -240,6 +286,13 @@ declare module '@tanstack/react-router' {
       path: '/sign'
       fullPath: '/sign'
       preLoaderRoute: typeof SignRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pdf-to-images': {
@@ -291,6 +344,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ImageToPdfRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/history': {
+      id: '/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof HistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/encrypt': {
       id: '/encrypt'
       path: '/encrypt'
@@ -319,6 +379,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CompressRoute: CompressRoute,
   EncryptRoute: EncryptRoute,
+  HistoryRoute: HistoryRoute,
   ImageToPdfRoute: ImageToPdfRoute,
   MergeRoute: MergeRoute,
   MetadataRoute: MetadataRoute,
@@ -326,8 +387,10 @@ const rootRouteChildren: RootRouteChildren = {
   OrganizeRoute: OrganizeRoute,
   PageNumbersRoute: PageNumbersRoute,
   PdfToImagesRoute: PdfToImagesRoute,
+  SettingsRoute: SettingsRoute,
   SignRoute: SignRoute,
   SplitRoute: SplitRoute,
+  ToolsRoute: ToolsRoute,
   UnlockRoute: UnlockRoute,
   WatermarkRoute: WatermarkRoute,
 }

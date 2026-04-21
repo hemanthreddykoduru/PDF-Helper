@@ -1,3 +1,5 @@
+import { storeFile, deleteFile, getFile } from "./db";
+
 export function downloadBlob(data: Uint8Array | Blob, filename: string, mime = "application/pdf") {
   const blob = data instanceof Blob ? data : new Blob([data as BlobPart], { type: mime });
   const url = URL.createObjectURL(blob);
@@ -21,17 +23,53 @@ export function stripExtension(name: string) {
   return name.replace(/\.[^.]+$/, "");
 }
 
-// Recent files (metadata only, never file content)
-export type RecentEntry = { name: string; size: number; operation: string; timestamp: number };
+// Recent files metadata
+export type RecentEntry = { 
+  name: string; 
+  size: number; 
+  operation: string; 
+  timestamp: number;
+  fileId?: string;
+};
 
 const KEY = "pk-recent";
 
-export function addRecent(entry: Omit<RecentEntry, "timestamp">) {
+export async function addRecent(entry: Omit<RecentEntry, "timestamp" | "fileId">, bytes?: Uint8Array) {
   try {
+    // Check for Auto-Wipe (Privacy Mode)
+    const autoWipe = localStorage.getItem("pk-auto-wipe") === "true";
+    if (autoWipe) {
+      console.log("Privacy Protocol Active: History bypass engaged.");
+      return;
+    }
+
     const list: RecentEntry[] = JSON.parse(localStorage.getItem(KEY) || "[]");
-    list.unshift({ ...entry, timestamp: Date.now() });
-    localStorage.setItem(KEY, JSON.stringify(list.slice(0, 10)));
-  } catch {}
+    const timestamp = Date.now();
+    const fileId = bytes ? `pk-${timestamp}` : undefined;
+
+    const newEntry: RecentEntry = { ...entry, timestamp, fileId };
+    list.unshift(newEntry);
+    
+    // Support Dynamic History Limit
+    const limit = parseInt(localStorage.getItem("pk-history-limit") || "10");
+    
+    if (list.length > limit) {
+      const removed = list.splice(limit);
+      for (const item of removed) {
+        if (item.fileId) {
+          await deleteFile(item.fileId).catch(() => {});
+        }
+      }
+    }
+
+    localStorage.setItem(KEY, JSON.stringify(list));
+    
+    if (bytes && fileId) {
+      await storeFile(fileId, bytes);
+    }
+  } catch (err) {
+    console.error("Storage failed:", err);
+  }
 }
 
 export function getRecent(): RecentEntry[] {
@@ -42,6 +80,21 @@ export function getRecent(): RecentEntry[] {
   }
 }
 
-export function clearRecent() {
+export async function downloadFromHistory(fileId: string, filename: string) {
+  const bytes = await getFile(fileId);
+  if (bytes) {
+    downloadBlob(bytes, filename);
+    return true;
+  }
+  return false;
+}
+
+export async function clearRecent() {
+  const list = getRecent();
+  for (const item of list) {
+    if (item.fileId) {
+      await deleteFile(item.fileId).catch(() => {});
+    }
+  }
   localStorage.removeItem(KEY);
 }

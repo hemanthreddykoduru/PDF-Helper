@@ -1,12 +1,14 @@
 import { PDFDocument, degrees, PageSizes, rgb, StandardFonts } from "pdf-lib";
+import { encryptPDF } from "@pdfsmaller/pdf-encrypt-lite";
 
-export async function readFileAsArrayBuffer(file: File | Blob): Promise<ArrayBuffer> {
+export async function readFileAsArrayBuffer(file: File | Blob | Uint8Array | ArrayBuffer): Promise<ArrayBuffer> {
+  if (file instanceof Uint8Array) return file.buffer;
+  if (file instanceof ArrayBuffer) return file;
   return await file.arrayBuffer();
 }
 
-export async function loadPdfDoc(file: File | Blob, password?: string) {
+export async function loadPdfDoc(file: File | Blob | Uint8Array | ArrayBuffer, password?: string) {
   const bytes = await readFileAsArrayBuffer(file);
-  // ignoreEncryption lets us at least open encrypted docs. For real decryption pass password.
   return await PDFDocument.load(bytes, {
     ignoreEncryption: true,
     ...(password ? { password } : {}),
@@ -23,7 +25,7 @@ export async function mergePdfs(files: File[]): Promise<Uint8Array> {
   return await out.save();
 }
 
-export async function extractPages(file: File, pageIndices: number[]): Promise<Uint8Array> {
+export async function extractPages(file: File | Uint8Array, pageIndices: number[]): Promise<Uint8Array> {
   const src = await loadPdfDoc(file);
   const out = await PDFDocument.create();
   const pages = await out.copyPages(src, pageIndices);
@@ -31,7 +33,7 @@ export async function extractPages(file: File, pageIndices: number[]): Promise<U
   return await out.save();
 }
 
-export async function splitToIndividualPages(file: File): Promise<{ name: string; bytes: Uint8Array }[]> {
+export async function splitToIndividualPages(file: File | Uint8Array): Promise<{ name: string; bytes: Uint8Array }[]> {
   const src = await loadPdfDoc(file);
   const total = src.getPageCount();
   const results: { name: string; bytes: Uint8Array }[] = [];
@@ -68,23 +70,12 @@ export async function encryptPdf(
   userPassword: string,
   ownerPassword?: string,
 ): Promise<Uint8Array> {
-  // pdf-lib doesn't support real encryption. We use a lightweight fallback that
-  // sets an owner password hint by re-saving. For true AES encryption in-browser,
-  // we rely on a community approach: qpdf-wasm would be ideal, but to keep things
-  // fully JS we use a simple approach via `pdf-lib` + the `encrypt` plugin shim.
-  // Since no reliable pure-JS encrypt exists, we fall back to raw password metadata.
   const doc = await loadPdfDoc(file);
-  // Store the attempted password as metadata marker so unlock flow can mirror.
-  doc.setSubject(`PaperKnife-Protected`);
-  // @ts-expect-error non-standard fallback: embed password hash so UI can gate
-  doc._paperknifeUser = userPassword;
-  // @ts-expect-error
-  doc._paperknifeOwner = ownerPassword;
-  return await doc.save();
+  const unencryptedBytes = await doc.save();
+  return await encryptPDF(unencryptedBytes, userPassword, ownerPassword);
 }
 
 export async function removePasswordFallback(file: File, password: string): Promise<Uint8Array> {
-  // Try to open ignoring encryption; if the PDF opens, re-save a clean copy.
   const src = await PDFDocument.load(await readFileAsArrayBuffer(file), {
     ignoreEncryption: true,
   });
@@ -96,19 +87,18 @@ export async function removePasswordFallback(file: File, password: string): Prom
 }
 
 export async function imagesToPdf(
-  images: File[],
+  images: { file: File; bytes: Uint8Array }[],
   pageSize: "A4" | "Letter" | "Fit" = "A4",
 ): Promise<Uint8Array> {
   const out = await PDFDocument.create();
-  for (const img of images) {
-    const bytes = new Uint8Array(await img.arrayBuffer());
-    const isPng = img.type.includes("png") || img.name.toLowerCase().endsWith(".png");
+  for (const item of images) {
+    const { file, bytes } = item;
+    const isPng = file.type.includes("png") || file.name.toLowerCase().endsWith(".png");
     let embed;
     if (isPng) embed = await out.embedPng(bytes);
     else {
-      // Convert webp/other via canvas to JPEG first
-      if (img.type === "image/webp" || /\.webp$/i.test(img.name)) {
-        const jpgBytes = await convertToJpeg(img);
+      if (file.type === "image/webp" || /\.webp$/i.test(file.name)) {
+        const jpgBytes = await convertToJpeg(file, bytes);
         embed = await out.embedJpg(jpgBytes);
       } else {
         embed = await out.embedJpg(bytes);
@@ -139,8 +129,9 @@ export async function imagesToPdf(
   return await out.save();
 }
 
-async function convertToJpeg(file: File): Promise<Uint8Array> {
-  const url = URL.createObjectURL(file);
+async function convertToJpeg(file: File, bytes: Uint8Array): Promise<Uint8Array> {
+  const blob = new Blob([bytes], { type: file.type });
+  const url = URL.createObjectURL(blob);
   try {
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
       const i = new Image();
@@ -189,7 +180,6 @@ export async function saveMetadata(
     doc.setKeywords([]);
     doc.setCreator("");
     doc.setProducer("");
-    // Can't delete dates but we can set both to same value
     const epoch = new Date(0);
     doc.setCreationDate(epoch);
     doc.setModificationDate(epoch);
@@ -209,10 +199,10 @@ export async function saveMetadata(
   return await doc.save();
 }
 
-export async function addWatermark(
-  file: File,
+export async function watermarkPdf(
+  file: File | Uint8Array,
+  text: string,
   opts: {
-    text: string;
     fontSize: number;
     opacity: number;
     angle: number;
@@ -226,7 +216,7 @@ export async function addWatermark(
   for (const page of pages) {
     const { width, height } = page.getSize();
     const drawText = (x: number, y: number, rotation: number) => {
-      page.drawText(opts.text, {
+      page.drawText(text, {
         x,
         y,
         size: opts.fontSize,
@@ -246,7 +236,7 @@ export async function addWatermark(
     } else if (opts.position === "diagonal") {
       drawText(width * 0.15, height * 0.35, opts.angle);
     } else {
-      const textWidth = font.widthOfTextAtSize(opts.text, opts.fontSize);
+      const textWidth = font.widthOfTextAtSize(text, opts.fontSize);
       drawText((width - textWidth) / 2, height / 2, 0);
     }
   }
@@ -260,7 +250,7 @@ export async function addPageNumbers(
     align: "left" | "center" | "right";
     fontSize: number;
     startAt: number;
-    format: string; // e.g. "{n} / {total}" or "Page {n}"
+    format: string;
   },
 ): Promise<Uint8Array> {
   const doc = await loadPdfDoc(file);
@@ -288,8 +278,8 @@ export async function addPageNumbers(
   return await doc.save();
 }
 
-export async function signPdf(
-  file: File,
+export async function registerSignature(
+  file: File | Uint8Array,
   signaturePngBytes: Uint8Array,
   placement: { pageIndex: number; x: number; y: number; width: number; height: number },
 ): Promise<Uint8Array> {
@@ -305,13 +295,8 @@ export async function signPdf(
   return await doc.save();
 }
 
-/**
- * "Compress" PDFs in-browser. pdf-lib uses object streams and can shrink some
- * files. For aggressive shrinking we re-embed images at reduced resolution by
- * rendering pages through pdf.js and rebuilding a JPEG-only PDF.
- */
 export async function compressPdf(
-  file: File,
+  file: File | Uint8Array,
   level: "low" | "medium" | "high",
 ): Promise<Uint8Array> {
   if (level === "low") {
@@ -319,7 +304,7 @@ export async function compressPdf(
     return await doc.save({ useObjectStreams: true });
   }
   const { pdfjsLib } = await import("@/lib/pdfjs");
-  const data = new Uint8Array(await file.arrayBuffer());
+  const data = await readFileAsArrayBuffer(file);
   const src = await pdfjsLib.getDocument({ data }).promise;
   const out = await PDFDocument.create();
   const scale = level === "medium" ? 1.3 : 0.9;

@@ -1,145 +1,140 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { Hash } from "lucide-react";
+import { Hash, FileText, ChevronLeft, Binary } from "lucide-react";
 import { FileDropzone } from "@/components/FileDropzone";
 import { Button } from "@/components/PKButton";
 import { PageHeader, ToolPage } from "@/components/PageHeader";
+import { ResultScreen } from "@/components/ResultScreen";
 import { addPageNumbers } from "@/utils/pdfHelpers";
-import { downloadBlob, stripExtension, addRecent } from "@/utils/fileUtils";
-import { cn } from "@/lib/utils";
+import { formatBytes, stripExtension, addRecent } from "@/utils/fileUtils";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/page-numbers")({
-  head: () => ({
-    meta: [
-      { title: "Add Page Numbers — PaperKnife" },
-      { name: "description", content: "Add customizable page numbers to your PDF." },
-    ],
-  }),
   component: PageNumbersTool,
 });
 
 function PageNumbersTool() {
-  const [file, setFile] = useState<File | null>(null);
-  const [position, setPosition] = useState<"header" | "footer">("footer");
-  const [align, setAlign] = useState<"left" | "center" | "right">("center");
-  const [fontSize, setFontSize] = useState(12);
-  const [startAt, setStartAt] = useState(1);
-  const [format, setFormat] = useState("{n} / {total}");
+  const navigate = useNavigate();
+  const [fileData, setFileData] = useState<{ file: File; bytes: Uint8Array } | null>(null);
+  const [startPage, setStartPage] = useState(1);
   const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ bytes: Uint8Array; name: string } | null>(null);
+
+  const onFiles = async (files: File[]) => {
+    if (!files[0]) return;
+    const bytes = new Uint8Array(await files[0].arrayBuffer());
+    setFileData({ file: files[0], bytes });
+  };
 
   const run = async () => {
-    if (!file) return;
+    if (!fileData) return;
     setBusy(true);
     try {
-      const bytes = await addPageNumbers(file, { position, align, fontSize, startAt, format });
-      const name = `${stripExtension(file.name)}-numbered.pdf`;
-      downloadBlob(bytes, name);
-      addRecent({ name, size: bytes.byteLength, operation: "Page numbers" });
+      await new Promise((resolve) => setTimeout(resolve, 1400));
+      const bytes = await addPageNumbers(fileData.bytes as any, { startPage });
+      const name = `${stripExtension(fileData.file.name)}-numbered.pdf`;
+      setResult({ bytes, name });
+      await addRecent({ name, size: bytes.byteLength, operation: "Page Numbers" }, bytes);
+      toast.success("Pagination sequence applied successfully.");
+    } catch (err) {
+      toast.error("Pagination failed: Indexing error.");
     } finally {
       setBusy(false);
     }
   };
 
+  const reset = () => {
+    setFileData(null);
+    setResult(null);
+  };
+
   return (
     <ToolPage>
-      <PageHeader
-        title="Page Numbers"
-        description="Stamp page numbers into the header or footer."
-        icon={<Hash className="h-5 w-5" />}
-      />
+      <div className="mx-auto max-w-2xl px-5 pt-4 pb-32">
+        <div className="flex items-center gap-4 mb-8">
+           <button onClick={() => navigate({ to: "/" })} className="h-10 w-10 flex items-center justify-center rounded-full bg-surface-elevated text-foreground/60 active:scale-90 transition-all">
+              <ChevronLeft className="h-6 w-6" />
+           </button>
+           <h1 className="text-xl font-black tracking-tight uppercase">Page Numbers</h1>
+        </div>
 
-      {!file && <FileDropzone onFiles={(f) => setFile(f[0])} />}
+        {!result ? (
+          <>
+            <PageHeader
+               title="Page Numbers"
+               description="Inject precision pagination markers into your PDF streams."
+               icon={<Hash className="h-5 w-5" />}
+            />
 
-      {file && (
-        <>
-          <div className="mb-4 flex items-center justify-between rounded-lg border border-border bg-surface px-3 py-2.5 text-sm">
-            <span className="truncate font-medium">{file.name}</span>
-            <button onClick={() => setFile(null)} className="text-xs text-muted-foreground hover:text-primary">
-              Change
-            </button>
-          </div>
-
-          <div className="space-y-5 rounded-lg border border-border bg-surface p-5">
-            <div>
-              <label className="mb-2 block text-sm font-medium">Position</label>
-              <div className="flex gap-2">
-                {(["header", "footer"] as const).map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => setPosition(p)}
-                    className={cn(
-                      "flex-1 rounded-md border px-3 py-1.5 text-sm font-medium capitalize",
-                      position === p ? "border-primary bg-primary/10 text-primary" : "border-border",
-                    )}
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium">Alignment</label>
-              <div className="flex gap-2">
-                {(["left", "center", "right"] as const).map((a) => (
-                  <button
-                    key={a}
-                    onClick={() => setAlign(a)}
-                    className={cn(
-                      "flex-1 rounded-md border px-3 py-1.5 text-sm font-medium capitalize",
-                      align === a ? "border-primary bg-primary/10 text-primary" : "border-border",
-                    )}
-                  >
-                    {a}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="mb-1 block text-sm font-medium">Font size: {fontSize}</label>
-                <input
-                  type="range"
-                  min={8}
-                  max={24}
-                  value={fontSize}
-                  onChange={(e) => setFontSize(+e.target.value)}
-                  className="w-full accent-primary"
+            {!fileData && (
+              <div className="mt-8">
+                <FileDropzone 
+                  onFiles={onFiles} 
+                  label="Drop PDF to Add Numbers"
+                  hint="Files processed locally — privacy guaranteed"
                 />
               </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">Start at</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={startAt}
-                  onChange={(e) => setStartAt(+e.target.value)}
-                  className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                />
+            )}
+
+            {fileData && (
+              <div className="mt-8 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="flex items-center justify-between rounded-[28px] border border-border/50 bg-surface p-6">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-base font-black tracking-tight">{fileData.file.name}</div>
+                    <div className="text-[10px] font-bold text-muted-foreground/60 uppercase">
+                      Target Document — {formatBytes(fileData.file.size)}
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => setFileData(null)}>Change</Button>
+                </div>
+
+                <div className="space-y-6 rounded-[28px] border border-border bg-surface p-6 sm:p-8 shadow-sm">
+                   <h3 className="text-[10px] font-black tracking-widest text-muted-foreground/60 uppercase">Indexing Configuration</h3>
+                   
+                   <div className="space-y-2">
+                      <label className="text-[9px] font-black tracking-widest text-muted-foreground/80 uppercase">Start Page Sequence At</label>
+                      <div className="relative">
+                        <Binary className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/30" />
+                        <input
+                          type="number"
+                          value={startPage}
+                          onChange={(e) => setStartPage(parseInt(e.target.value) || 1)}
+                          className="h-12 w-full rounded-xl border border-border bg-background pl-11 pr-4 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          min="1"
+                        />
+                      </div>
+                    </div>
+
+                  <div className="pt-2">
+                    <Button onClick={run} loading={busy} className="w-full h-14 rounded-2xl shadow-lg">
+                      Apply Pagination
+                    </Button>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
+          </>
+        ) : (
+          <ResultScreen 
+             result={result} 
+             onReset={reset} 
+             operationLabel="Paginated Document"
+             successMessage="Pagination Sequence Applied"
+          />
+        )}
+      </div>
 
-            <div>
-              <label className="mb-1 block text-sm font-medium">Format</label>
-              <input
-                value={format}
-                onChange={(e) => setFormat(e.target.value)}
-                className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-              <p className="mt-1 text-xs text-muted-foreground">
-                Use <code className="rounded bg-muted px-1">{"{n}"}</code> for the current page and{" "}
-                <code className="rounded bg-muted px-1">{"{total}"}</code> for the page count.
-              </p>
-            </div>
-
-            <div className="flex justify-end">
-              <Button onClick={run} loading={busy}>
-                Apply & download
-              </Button>
-            </div>
+       {busy && (
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background/90 backdrop-blur-2xl animate-in fade-in duration-500">
+          <div className="relative mb-8">
+             <div className="h-24 w-24 animate-spin rounded-full border-4 border-primary/5 border-t-primary" />
+             <Hash className="absolute inset-0 m-auto h-10 w-10 text-primary animate-pulse" />
           </div>
-        </>
+          <h2 className="text-2xl font-black tracking-tighter uppercase px-6 text-center">Indexing Engine</h2>
+          <p className="mt-2 text-[10px] font-black tracking-[.3em] text-muted-foreground/40 uppercase">
+            Calculating structural offsets locally
+          </p>
+        </div>
       )}
     </ToolPage>
   );

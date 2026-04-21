@@ -3,7 +3,7 @@ import { renderPageThumbnails } from "@/utils/pdfHelpers";
 
 export type Thumb = { page: number; dataUrl: string; width: number; height: number };
 
-export function useThumbnails(file: File | null, maxWidth = 200) {
+export function useThumbnails(file: File | Uint8Array | null, maxWidth = 200) {
   const [thumbs, setThumbs] = useState<Thumb[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -1,104 +1,141 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { ImageDown, Download } from "lucide-react";
+import { Copy, Download, FileText, ChevronLeft, Zap, ImageIcon, Archive } from "lucide-react";
 import JSZip from "jszip";
 import { FileDropzone } from "@/components/FileDropzone";
 import { Button } from "@/components/PKButton";
 import { PageHeader, ToolPage } from "@/components/PageHeader";
-import { useThumbnails } from "@/hooks/useThumbnails";
-import { renderPagesToPngs } from "@/utils/pdfHelpers";
-import { downloadBlob, stripExtension, addRecent } from "@/utils/fileUtils";
+import { ResultScreen } from "@/components/ResultScreen";
+import { renderPagesToPngs } from "@/utils/pdfHelpers"; // Corrected name
+import { formatBytes, stripExtension, addRecent } from "@/utils/fileUtils";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/pdf-to-images")({
-  head: () => ({
-    meta: [
-      { title: "PDF to Images — PaperKnife" },
-      { name: "description", content: "Export every PDF page as a PNG image." },
-    ],
-  }),
-  component: PdfToImages,
+  component: PdfToImagesTool,
 });
 
-function PdfToImages() {
-  const [file, setFile] = useState<File | null>(null);
+function PdfToImagesTool() {
+  const navigate = useNavigate();
+  const [fileData, setFileData] = useState<{ file: File; bytes: Uint8Array } | null>(null);
   const [busy, setBusy] = useState(false);
-  const { thumbs, loading } = useThumbnails(file, 260);
+  const [result, setResult] = useState<{ bytes: Blob; name: string } | null>(null);
 
-  const downloadOne = async (pageIdx: number) => {
-    if (!file) return;
+  const onFiles = async (files: File[]) => {
+    if (!files[0]) return;
+    const bytes = new Uint8Array(await files[0].arrayBuffer());
+    setFileData({ file: files[0], bytes });
+  };
+
+  const run = async () => {
+    if (!fileData) return;
     setBusy(true);
     try {
-      const pngs = await renderPagesToPngs(file, 2);
-      const bytes = pngs[pageIdx];
-      const name = `${stripExtension(file.name)}-page-${pageIdx + 1}.png`;
-      downloadBlob(bytes, name, "image/png");
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const images = await renderPagesToPngs(fileData.file as any); // Corrected function call
+      const zip = new JSZip();
+      
+      images.forEach((imgBytes, i) => {
+        zip.file(`page-${i + 1}.png`, imgBytes);
+      });
+      
+      const blob = await zip.generateAsync({ type: "blob" });
+      const name = `${stripExtension(fileData.file.name)}-images.zip`;
+      
+      setResult({ bytes: blob, name });
+      
+      await addRecent({
+        name,
+        size: blob.size,
+        operation: "PDF → Images",
+      });
+      
+      toast.success("Document fragmentation complete: ZIP ready.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Process failed: Image synthesis error.");
     } finally {
       setBusy(false);
     }
   };
 
-  const downloadAll = async () => {
-    if (!file) return;
-    setBusy(true);
-    try {
-      const pngs = await renderPagesToPngs(file, 2);
-      const zip = new JSZip();
-      pngs.forEach((b, i) => zip.file(`page-${i + 1}.png`, b));
-      const blob = await zip.generateAsync({ type: "blob" });
-      const name = `${stripExtension(file.name)}-pages.zip`;
-      downloadBlob(blob, name, "application/zip");
-      addRecent({ name, size: blob.size, operation: "PDF → Images" });
-    } finally {
-      setBusy(false);
-    }
+  const reset = () => {
+    setFileData(null);
+    setResult(null);
   };
 
   return (
     <ToolPage>
-      <PageHeader
-        title="PDF to Images"
-        description="Render each PDF page as a PNG. Download individually or as a ZIP."
-        icon={<ImageDown className="h-5 w-5" />}
-      />
+      <div className="mx-auto max-w-2xl px-5 pt-4 pb-32">
+        <div className="flex items-center gap-4 mb-8">
+           <button onClick={() => navigate({ to: "/" })} className="h-10 w-10 flex items-center justify-center rounded-full bg-surface-elevated text-foreground/60 active:scale-90 transition-all">
+              <ChevronLeft className="h-6 w-6" />
+           </button>
+           <h1 className="text-xl font-black tracking-tight uppercase">PDF → Images</h1>
+        </div>
 
-      {!file && <FileDropzone onFiles={(f) => setFile(f[0])} />}
+        {!result ? (
+          <>
+            <PageHeader
+               title="PDF → Images"
+               description="Convert document layers into high-fidelity image sequences."
+               icon={<ImageIcon className="h-5 w-5" />}
+            />
 
-      {file && (
-        <>
-          <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2.5 text-sm">
-            <span className="truncate font-medium">{file.name}</span>
-            <span className="text-muted-foreground">{thumbs.length} pages</span>
-            <div className="ml-auto flex gap-2">
-              <Button size="sm" onClick={downloadAll} loading={busy} disabled={!thumbs.length}>
-                <Download className="h-4 w-4" /> Download all (ZIP)
-              </Button>
-              <button onClick={() => setFile(null)} className="text-xs text-muted-foreground hover:text-primary">
-                Change
-              </button>
-            </div>
-          </div>
+            {!fileData && (
+              <div className="mt-8">
+                <FileDropzone 
+                  onFiles={onFiles} 
+                  label="Drop PDF to Transform"
+                  hint="Export all pages as PNG images in a ZIP"
+                />
+              </div>
+            )}
 
-          {loading && <div className="py-10 text-center text-muted-foreground">Rendering pages…</div>}
+            {fileData && (
+              <div className="mt-8 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="flex items-center justify-between rounded-[28px] border border-border/50 bg-surface p-6">
+                  <div className="min-w-0 flex-1 flex items-center gap-4">
+                     <div className="h-10 w-10 rounded-xl bg-primary/5 flex items-center justify-center text-primary">
+                        <FileText className="h-5 w-5" />
+                     </div>
+                     <div className="min-w-0">
+                       <div className="truncate text-sm font-black tracking-tight">{fileData.file.name}</div>
+                       <div className="text-[10px] font-bold text-muted-foreground/40 uppercase">{formatBytes(fileData.file.size)}</div>
+                     </div>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => setFileData(null)}>Change</Button>
+                </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-            {thumbs.map((t, i) => (
-              <div key={t.page} className="overflow-hidden rounded-lg border border-border bg-white">
-                <img src={t.dataUrl} alt={`Page ${t.page}`} className="block w-full" />
-                <div className="flex items-center justify-between border-t border-border bg-surface px-2 py-1.5">
-                  <span className="text-xs font-medium">Page {t.page}</span>
-                  <button
-                    onClick={() => downloadOne(i)}
-                    disabled={busy}
-                    className="rounded p-1 text-primary hover:bg-muted disabled:opacity-50"
-                    aria-label={`Download page ${t.page}`}
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                  </button>
+                <div className="pt-4">
+                  <Button onClick={run} loading={busy} className="w-full h-16 rounded-[24px] text-sm font-black tracking-widest shadow-2xl">
+                    <Zap className="mr-2 h-5 w-5" />
+                    Transform to Images
+                  </Button>
                 </div>
               </div>
-            ))}
+            )}
+          </>
+        ) : (
+          <ResultScreen 
+             result={result} 
+             onReset={reset} 
+             operationLabel="Visual Asset Bundle"
+             successMessage="Transformation Complete"
+          />
+        )}
+      </div>
+
+       {busy && (
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background/90 backdrop-blur-2xl animate-in fade-in duration-500">
+          <div className="relative mb-8">
+             <div className="h-24 w-24 animate-spin rounded-full border-4 border-primary/5 border-t-primary" />
+             <ImageIcon className="absolute inset-0 m-auto h-10 w-10 text-primary animate-pulse" />
           </div>
-        </>
+          <h2 className="text-2xl font-black tracking-tighter uppercase px-6 text-center">Visual Synthesis</h2>
+          <p className="mt-2 text-[10px] font-black tracking-[.3em] text-muted-foreground/40 uppercase">
+            Rendering document layers locally
+          </p>
+        </div>
       )}
     </ToolPage>
   );

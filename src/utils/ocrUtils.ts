@@ -15,7 +15,7 @@ export async function ocrImage(
 }
 
 export async function ocrPdf(
-  file: File,
+  file: File | Uint8Array,
   onProgress?: (p: number, page: number, total: number) => void,
 ): Promise<string> {
   const { renderPagesToPngs } = await import("@/utils/pdfHelpers");
