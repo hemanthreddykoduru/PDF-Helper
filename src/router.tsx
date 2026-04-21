@@ -23,10 +23,11 @@ function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => vo
 
 
 export const getRouter = () => {
-  const history = typeof window !== "undefined" ? createHashHistory() : undefined;
+  const isCapacitor = typeof window !== "undefined" && (window as any).Capacitor;
+  const history = typeof window !== "undefined" && isCapacitor ? createHashHistory() : undefined;
   
   if (typeof window !== "undefined") {
-    console.log("Initializing router with history:", history ? "hash" : "none");
+    console.log("Initializing router. Mode:", isCapacitor ? "Capacitor (Hash)" : "Web (Browser)");
   }
 
   const router = createRouter({

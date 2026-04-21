@@ -1,4 +1,4 @@
-import { Outlet, Link, createRootRoute } from "@tanstack/react-router";
+import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AppShell } from "@/components/AppShell";
 import "../styles.css";
@@ -29,11 +29,31 @@ export const Route = createRootRoute({
 });
 
 function RootComponent() {
-  return (
+  const isCapacitor = typeof window !== "undefined" && (window as any).Capacitor;
+
+  const content = (
     <ThemeProvider>
       <AppShell>
         <Outlet />
       </AppShell>
     </ThemeProvider>
+  );
+
+  if (isCapacitor) {
+    // Mobile APK Mode: Minimal shell to avoid hydration crashes
+    return content;
+  }
+
+  // Web/Vercel Mode: Full HTML shell for SSR and SEO
+  return (
+    <html lang="en">
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        {content}
+        <Scripts />
+      </body>
+    </html>
   );
 }
