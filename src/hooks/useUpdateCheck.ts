@@ -4,7 +4,7 @@ import { Dialog } from "@capacitor/dialog";
 import { Browser } from "@capacitor/browser";
 import pkg from "../../package.json";
 
-const VERSION_URL = "https://paper-cut-craft-main.vercel.app/version.json";
+const VERSION_URL = "https://pdf-helper45.vercel.app/version.json";
 
 export function useUpdateCheck() {
   useEffect(() => {
