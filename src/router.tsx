@@ -25,20 +25,18 @@ function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => vo
 const isCapacitor = typeof window !== "undefined" && (window as any).Capacitor;
 const history = typeof window !== "undefined" && isCapacitor ? createHashHistory() : undefined;
 
-// We export a fixed singleton 'router' instance at the top-level.
-// This is the standard TanStack protocol and prevents most 'Invariant failed' errors.
+// Pure SPA Router
+// We have completely removed @tanstack/react-start to end the 'Invariant failed' crashes.
+// This is now a standard browser-only TanStack Router instance.
 export const router = createRouter({
   routeTree,
   history,
-  basepath: "/", // Force absolute root for both platforms
+  basepath: "/", // Force absolute root
   context: {},
   scrollRestoration: true,
   defaultPreloadStaleTime: 0,
   defaultErrorComponent: DefaultErrorComponent,
 });
-
-// Retro-compatibility with our entry point logic
-export const getRouter = () => router;
 
 declare module "@tanstack/react-router" {
   interface Register {
