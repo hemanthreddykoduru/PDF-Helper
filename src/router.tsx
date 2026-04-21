@@ -21,16 +21,20 @@ function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => vo
   );
 }
 
+// Singleton storage to prevent multiple initialization
+let routerInstance: ReturnType<typeof createRouter> | null = null;
 
 export const getRouter = () => {
+  if (routerInstance) return routerInstance;
+
   const isCapacitor = typeof window !== "undefined" && (window as any).Capacitor;
   const history = typeof window !== "undefined" && isCapacitor ? createHashHistory() : undefined;
   
   if (typeof window !== "undefined") {
-    console.log("Initializing router. Mode:", isCapacitor ? "Capacitor (Hash)" : "Web (Browser)");
+    console.log("Initializing Singleton Router. Mode:", isCapacitor ? "Capacitor (Hash)" : "Web (Browser)");
   }
 
-  const router = createRouter({
+  routerInstance = createRouter({
     routeTree,
     history,
     context: {},
@@ -38,7 +42,8 @@ export const getRouter = () => {
     defaultPreloadStaleTime: 0,
     defaultErrorComponent: DefaultErrorComponent,
   });
-  return router;
+
+  return routerInstance;
 };
 
 declare module "@tanstack/react-router" {
