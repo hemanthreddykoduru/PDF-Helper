@@ -8,6 +8,8 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
   vite: {
-    base: "./",
+    // On Vercel, we need absolute paths (/) for SSR to work correctly.
+    // In Capacitor (Mobile), we need relative paths (./) for the filesystem WebView.
+    base: process.env.VERCEL ? "/" : "./",
   },
 });
